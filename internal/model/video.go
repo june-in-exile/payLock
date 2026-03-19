@@ -33,10 +33,14 @@ func NewVideoStore() *VideoStore {
 }
 
 func (s *VideoStore) Create(id string) *Video {
+	return s.CreateAt(id, time.Now().UTC())
+}
+
+func (s *VideoStore) CreateAt(id string, t time.Time) *Video {
 	v := &Video{
 		ID:        id,
 		Status:    StatusProcessing,
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: t.Format(time.RFC3339),
 	}
 	s.mu.Lock()
 	s.videos[id] = v

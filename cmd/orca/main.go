@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"embed"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -16,6 +18,9 @@ import (
 	"github.com/anthropics/orca/internal/processor"
 	"github.com/anthropics/orca/internal/storage"
 )
+
+//go:embed web
+var webFS embed.FS
 
 func main() {
 	cfg, err := config.Load()
@@ -35,9 +40,20 @@ func main() {
 	mux.Handle("POST /api/upload", apiAuth(handler.NewUpload(store, proc, videos, cfg)))
 	mux.Handle("GET /api/status/{id}", apiAuth(handler.NewStatus(videos)))
 
+	// Video list
+	mux.Handle("GET /api/videos", apiAuth(handler.NewVideos(videos)))
+
 	// Stream routes (with CORS)
 	cors := middleware.CORS()
 	mux.Handle("GET /stream/{id}/{file...}", cors(handler.NewStream(store, videos)))
+
+	// Frontend (embedded static files)
+	webSub, err := fs.Sub(webFS, "web")
+	if err != nil {
+		slog.Error("failed to create web filesystem", "error", err)
+		os.Exit(1)
+	}
+	mux.Handle("GET /", http.FileServer(http.FS(webSub)))
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
