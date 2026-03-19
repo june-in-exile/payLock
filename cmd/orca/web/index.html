@@ -590,7 +590,7 @@
     <nav>
       <a href="#videos" class="nav-link active" data-view="videos">Videos</a>
       <a href="#upload" class="nav-link" data-view="upload">Upload</a>
-      <a href="#compare-demo" class="nav-link" data-view="compare">Compare</a>
+      <a href="#compare" class="nav-link" data-view="compare">Compare</a>
     </nav>
   </header>
 
@@ -827,9 +827,13 @@ hls.<span class="function">loadSource</span>(manifest);
       } else if (view === 'player' && params && params.id) {
         window.location.hash = 'play/' + params.id;
         loadPlayer(params.id);
-      } else if (view === 'compare' && params && params.id) {
-        window.location.hash = 'compare/' + params.id;
-        loadCompareView(params.id);
+      } else if (view === 'compare') {
+        if (params && params.id) {
+          window.location.hash = 'compare/' + params.id;
+          loadCompareView(params.id);
+        } else {
+          window.location.hash = 'compare';
+        }
       }
     }
 
@@ -1203,13 +1207,8 @@ hls.<span class="function">loadSource</span>(manifest);
       } else if (hash.startsWith('compare/')) {
         const id = hash.slice(8);
         navigate('compare', { id: id });
-      } else if (hash === 'upload') {
-        navigate('upload');
-      } else if (hash === 'compare-demo') {
-        // Redirect to videos page with message
-        navigate('videos');
-      } else {
-        navigate('videos');
+      } else if (hash === 'compare') {
+        navigate('compare');
       }
     }
 
