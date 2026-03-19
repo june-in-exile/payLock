@@ -378,6 +378,210 @@
       border-color: var(--text);
       color: var(--text);
     }
+
+    /* Compare View */
+    .compare-container {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .compare-panel {
+      flex: 1;
+      min-width: 400px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .compare-header {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .compare-title {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .compare-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    .compare-badge.orca {
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--accent);
+    }
+
+    .compare-badge.walrus {
+      background: rgba(168, 85, 247, 0.15);
+      color: #a855f7;
+    }
+
+    .compare-player {
+      background: #000;
+      aspect-ratio: 16/9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      position: relative;
+    }
+
+    .compare-player video {
+      width: 100%;
+      height: 100%;
+    }
+
+    .compare-player .loading {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .compare-stats {
+      padding: 1rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+
+    .stat-row:last-child {
+      border-bottom: none;
+    }
+
+    .stat-label {
+      color: var(--text-muted);
+    }
+
+    .stat-value {
+      font-family: monospace;
+      font-weight: 500;
+    }
+
+    .stat-value.fast { color: var(--success); }
+    .stat-value.slow { color: var(--error); }
+    .stat-value.neutral { color: var(--warning); }
+
+    .compare-actions {
+      padding: 0.75rem 1rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .btn-compare {
+      padding: 0.4rem 0.75rem;
+      font-size: 0.8rem;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: var(--accent);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-compare:hover {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: var(--accent);
+    }
+
+    /* Dev Experience */
+    .dev-section {
+      margin-top: 2rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .dev-header {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .dev-header h3 {
+      font-size: 1rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .dev-header p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .dev-comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+
+    .dev-column {
+      padding: 1.25rem;
+    }
+
+    .dev-column:first-child {
+      border-right: 1px solid var(--border);
+    }
+
+    .dev-column h4 {
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .dev-code {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 0.75rem;
+      line-height: 1.6;
+      overflow-x: auto;
+    }
+
+    .dev-code .comment { color: var(--text-muted); }
+    .dev-code .keyword { color: #c678dd; }
+    .dev-code .string { color: #98c379; }
+    .dev-code .function { color: #61afef; }
+
+    .dev-pros {
+      margin-top: 1rem;
+      font-size: 0.85rem;
+    }
+
+    .dev-pros li {
+      margin-bottom: 0.5rem;
+      padding-left: 1rem;
+      position: relative;
+    }
+
+    .dev-pros li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--success);
+    }
+
+    .dev-pros li.con::before { content: "✗"; color: var(--error); }
   </style>
 </head>
 <body>
@@ -386,6 +590,7 @@
     <nav>
       <a href="#videos" class="nav-link active" data-view="videos">Videos</a>
       <a href="#upload" class="nav-link" data-view="upload">Upload</a>
+      <a href="#compare-demo" class="nav-link" data-view="compare">Compare</a>
     </nav>
   </header>
 
@@ -425,17 +630,6 @@
         <div class="progress-text" id="progress-text">Uploading...</div>
       </div>
       <div class="upload-result" id="upload-result"></div>
-      <div class="upload-success-screen" id="upload-success">
-        <div class="success-icon">
-          <svg viewBox="0 0 24 24"><path class="check-path" d="M5 13l4 4L19 7"/></svg>
-        </div>
-        <h3>Upload Complete</h3>
-        <p class="success-detail">Your video is now being processed.</p>
-        <div class="success-id" id="success-video-id"></div>
-        <br>
-        <button class="btn" id="success-watch-btn">Watch Video</button>
-        <p class="auto-redirect" id="auto-redirect-text"></p>
-      </div>
     </div>
 
     <!-- Player view -->
@@ -451,6 +645,137 @@
       <div class="stream-url" id="stream-url"></div>
       <div class="player-actions">
         <button class="btn btn-sm btn-outline" onclick="copyStreamUrl()">Copy URL</button>
+        <button class="btn-compare" id="compare-btn" onclick="goToCompare()" style="display:none;">Compare vs Walrus</button>
+      </div>
+    </div>
+
+    <!-- Compare view -->
+    <div id="view-compare" class="view">
+      <a class="back-link" onclick="navigate('videos')">&larr; Back to videos</a>
+      <h2>Orca vs Walrus Comparison</h2>
+      <div class="compare-container">
+        <div class="compare-panel" id="orca-panel">
+          <div class="compare-header">
+            <span class="compare-title">Orca (Centralized)</span>
+            <span class="compare-badge orca">Middleware + Local</span>
+          </div>
+          <div class="compare-player" id="orca-player-container">
+            <video id="compare-orca-video" controls muted></video>
+          </div>
+          <div class="compare-stats" id="orca-stats">
+            <div class="stat-row">
+              <span class="stat-label">Status</span>
+              <span class="stat-value" id="orca-status">Loading...</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">First Frame Latency</span>
+              <span class="stat-value" id="orca-first-frame">--</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Seek Latency</span>
+              <span class="stat-value" id="orca-seek-latency">--</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Buffer Health</span>
+              <span class="stat-value" id="orca-buffer">--</span>
+            </div>
+          </div>
+          <div class="compare-actions">
+            <button class="btn-compare" onclick="simulateSeek('orca')">Test Seek</button>
+          </div>
+        </div>
+        <div class="compare-panel" id="walrus-panel">
+          <div class="compare-header">
+            <span class="compare-title">Walrus (Decentralized)</span>
+            <span class="compare-badge walrus">Direct from Sui</span>
+          </div>
+          <div class="compare-player" id="walrus-player-container">
+            <video id="compare-walrus-video" controls muted></video>
+          </div>
+          <div class="compare-stats" id="walrus-stats">
+            <div class="stat-row">
+              <span class="stat-label">Status</span>
+              <span class="stat-value" id="walrus-status">Simulated</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">First Frame Latency</span>
+              <span class="stat-value" id="walrus-first-frame">~2-5s</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Seek Latency</span>
+              <span class="stat-value" id="walrus-seek-latency">~3-8s</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Blob ID</span>
+              <span class="stat-value" id="walrus-blob-id" style="font-size:0.75rem;">Pending...</span>
+            </div>
+          </div>
+          <div class="compare-actions">
+            <button class="btn-compare" onclick="simulateSeek('walrus')">Test Seek</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Developer Experience Comparison -->
+      <div class="dev-section">
+        <div class="dev-header">
+          <h3>Developer Experience</h3>
+          <p>API usage comparison between Orca and Walrus</p>
+        </div>
+        <div class="dev-comparison">
+          <div class="dev-column">
+            <h4><span class="compare-badge orca">Orca</span></h4>
+            <div class="dev-code">
+<span class="comment">// 1. Upload video</span>
+<span class="keyword">const</span> res = <span class="keyword">await</span> fetch(<span class="string">'/api/upload'</span>, {
+  method: <span class="string">'POST'</span>,
+  headers: { <span class="string">'X-API-Key'</span>: key },
+  body: formData
+});
+<span class="keyword">const</span> { id } = <span class="keyword">await</span> res.json();
+
+<span class="comment">// 2. Get HLS manifest URL</span>
+<span class="keyword">const</span> manifest = 
+  <span class="string">`/stream/${id}/index.m3u8`</span>;
+
+<span class="comment">// 3. Play with hls.js</span>
+<span class="keyword">const</span> hls = <span class="keyword">new</span> <span class="function">Hls</span>();
+hls.<span class="function">loadSource</span>(manifest);
+            </div>
+            <ul class="dev-pros">
+              <li>Simple REST API</li>
+              <li>HLS ready out of box</li>
+              <li>Low latency streaming</li>
+              <li class="con">Centralized dependency</li>
+            </ul>
+          </div>
+          <div class="dev-column">
+            <h4><span class="compare-badge walrus">Walrus</span></h4>
+            <div class="dev-code">
+<span class="comment">// 1. Upload to Walrus Publisher</span>
+<span class="keyword">const</span> res = <span class="keyword">await</span> fetch(<span class="string">'Publisher API'</span>, {
+  method: <span class="string">'POST'</span>,
+  body: videoBlob
+});
+<span class="keyword">const</span> { blobId } = <span class="keyword">await</span> res.json();
+
+<span class="comment">// 2. Fetch from Aggregator</span>
+<span class="keyword">const</span> manifest = 
+  <span class="string">`Aggregator/${blobId}/index.m3u8`</span>;
+
+<span class="comment">// 3. Need custom HLS handling</span>
+<span class="comment">// + blob mapping management</span>
+            </div>
+            <ul class="dev-pros">
+              <li>Truly decentralized</li>
+              <li>No single point of failure</li>
+              <li>Global availability</li>
+              <li class="con">Higher latency</li>
+              <li class="con">Complex integration</li>
+              <li class="con">No native HLS support</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   </main>
@@ -461,6 +786,8 @@
     let currentView = 'videos';
     let pollInterval = null;
     let navGeneration = 0;
+    let compareOrcaHls = null;
+    let compareWalrusHls = null;
 
     // Navigation
     function navigate(view, params) {
@@ -473,8 +800,20 @@
         pollInterval = null;
       }
 
+      // Clean up compare players if they exist
+      if (compareOrcaHls) {
+        compareOrcaHls.destroy();
+        compareOrcaHls = null;
+      }
+      if (compareWalrusHls) {
+        compareWalrusHls.destroy();
+        compareWalrusHls = null;
+      }
+
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-      document.getElementById('view-' + view).classList.add('active');
+      const viewEl = document.getElementById('view-' + view);
+      if (viewEl) viewEl.classList.add('active');
+      
       document.querySelectorAll('.nav-link').forEach(a => {
         a.classList.toggle('active', a.dataset.view === view);
       });
@@ -488,6 +827,9 @@
       } else if (view === 'player' && params && params.id) {
         window.location.hash = 'play/' + params.id;
         loadPlayer(params.id);
+      } else if (view === 'compare' && params && params.id) {
+        window.location.hash = 'compare/' + params.id;
+        loadCompareView(params.id);
       }
     }
 
@@ -688,7 +1030,7 @@
         if (xhr.status === 202) {
           const data = JSON.parse(xhr.responseText);
           uploadFile.value = '';
-          showUploadSuccess(data.id);
+          navigate('player', { id: data.id });
         } else {
           let msg = 'Upload failed.';
           try { msg = JSON.parse(xhr.responseText).error || msg; } catch(e) {}
@@ -709,54 +1051,13 @@
       uploadResult.textContent = message;
     }
 
-    let uploadSuccessTimer = null;
-
-    function showUploadSuccess(videoId) {
-      uploadArea.style.display = 'none';
-      document.querySelector('.api-key-section').style.display = 'none';
-      uploadResult.style.display = 'none';
-      uploadProgress.classList.remove('active');
-
-      const successScreen = document.getElementById('upload-success');
-      document.getElementById('success-video-id').textContent = videoId;
-      successScreen.classList.remove('active');
-      // Force reflow so animation replays
-      void successScreen.offsetWidth;
-      successScreen.classList.add('active');
-
-      const redirectText = document.getElementById('auto-redirect-text');
-      let countdown = 5;
-      redirectText.textContent = 'Redirecting to player in ' + countdown + 's...';
-
-      const goToPlayer = () => {
-        clearInterval(uploadSuccessTimer);
-        uploadSuccessTimer = null;
-        resetUploadView();
-        navigate('player', { id: videoId });
-      };
-
-      document.getElementById('success-watch-btn').onclick = goToPlayer;
-
-      uploadSuccessTimer = setInterval(() => {
-        countdown--;
-        if (countdown <= 0) {
-          goToPlayer();
-        } else {
-          redirectText.textContent = 'Redirecting to player in ' + countdown + 's...';
-        }
-      }, 1000);
-    }
-
     function resetUploadView() {
       uploadArea.style.display = '';
       document.querySelector('.api-key-section').style.display = '';
       uploadResult.className = 'upload-result';
       uploadResult.style.display = 'none';
-      document.getElementById('upload-success').classList.remove('active');
-      if (uploadSuccessTimer) {
-        clearInterval(uploadSuccessTimer);
-        uploadSuccessTimer = null;
-      }
+      uploadProgress.classList.remove('active');
+      uploadFile.value = '';
     }
 
     // Player
@@ -807,6 +1108,7 @@
           const streamUrl = window.location.origin + '/stream/' + encodeURIComponent(id) + '/index.m3u8';
           urlEl.textContent = streamUrl;
           startPlayer(videoEl, streamUrl);
+          document.getElementById('compare-btn').style.display = '';
         } else if (video.status === 'processing') {
           urlEl.textContent = 'Processing... will auto-play when ready.';
           pollInterval = setInterval(async () => {
@@ -834,6 +1136,7 @@
                 const sUrl = window.location.origin + '/stream/' + encodeURIComponent(id) + '/index.m3u8';
                 urlEl.textContent = sUrl;
                 startPlayer(videoEl, sUrl);
+                document.getElementById('compare-btn').style.display = '';
               } else if (v.status === 'failed') {
                 clearInterval(pollInterval);
                 pollInterval = null;
@@ -897,8 +1200,14 @@
       if (hash.startsWith('play/')) {
         const id = hash.slice(5);
         navigate('player', { id: id });
+      } else if (hash.startsWith('compare/')) {
+        const id = hash.slice(8);
+        navigate('compare', { id: id });
       } else if (hash === 'upload') {
         navigate('upload');
+      } else if (hash === 'compare-demo') {
+        // Redirect to videos page with message
+        navigate('videos');
       } else {
         navigate('videos');
       }
@@ -906,6 +1215,228 @@
 
     window.addEventListener('hashchange', handleRoute);
     handleRoute();
+
+    // Compare View
+    let compareVideoId = null;
+    let orcaFirstFrameTime = null;
+    let walrusSimulatedLatency = null;
+
+    function goToCompare() {
+      const id = document.getElementById('player-video-id').textContent;
+      navigate('compare', { id: id });
+    }
+
+    async function loadCompareView(id) {
+      compareVideoId = id;
+      orcaFirstFrameTime = null;
+
+      // Clean up previous players
+      if (compareOrcaHls) {
+        compareOrcaHls.destroy();
+        compareOrcaHls = null;
+      }
+      if (compareWalrusHls) {
+        compareWalrusHls.destroy();
+        compareWalrusHls = null;
+      }
+
+      const orcaVideo = document.getElementById('compare-orca-video');
+      const walrusVideo = document.getElementById('compare-walrus-video');
+      orcaVideo.removeAttribute('src');
+      walrusVideo.removeAttribute('src');
+
+      // Reset stats
+      document.getElementById('orca-status').textContent = 'Loading...';
+      document.getElementById('orca-status').className = 'stat-value';
+      document.getElementById('orca-first-frame').textContent = '--';
+      document.getElementById('orca-seek-latency').textContent = '--';
+      document.getElementById('orca-buffer').textContent = '--';
+      document.getElementById('walrus-status').textContent = 'Simulated';
+      document.getElementById('walrus-first-frame').textContent = '~2-5s';
+      document.getElementById('walrus-seek-latency').textContent = '~3-8s';
+      document.getElementById('walrus-blob-id').textContent = 'Pending...';
+
+      try {
+        const res = await fetch('/api/status/' + encodeURIComponent(id), {
+          headers: { 'X-API-Key': getApiKey() }
+        });
+
+        if (!res.ok) {
+          document.getElementById('orca-status').textContent = 'Error';
+          document.getElementById('orca-status').className = 'stat-value slow';
+          return;
+        }
+
+        const video = await res.json();
+
+        if (video.status !== 'ready') {
+          document.getElementById('orca-status').textContent = video.status;
+          document.getElementById('orca-status').className = 'stat-value neutral';
+          return;
+        }
+
+        // Start Orca playback
+        const orcaManifest = window.location.origin + '/stream/' + encodeURIComponent(id) + '/index.m3u8';
+        startCompareOrca(orcaVideo, orcaManifest, video.id);
+
+        // Simulate Walrus (for now, use same manifest with delay)
+        simulateWalrusDemo(walrusVideo, video.id);
+
+      } catch (err) {
+        document.getElementById('orca-status').textContent = 'Error';
+        document.getElementById('orca-status').className = 'stat-value slow';
+      }
+    }
+
+    function startCompareOrca(videoEl, manifestUrl, id) {
+      const startTime = performance.now();
+
+      if (Hls.isSupported()) {
+        compareOrcaHls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true
+        });
+
+        compareOrcaHls.loadSource(manifestUrl);
+        compareOrcaHls.attachMedia(videoEl);
+
+        compareOrcaHls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+          document.getElementById('orca-status').textContent = 'Playing';
+          document.getElementById('orca-status').className = 'stat-value fast';
+          videoEl.play().catch(() => {});
+
+          // Track buffer health
+          setInterval(() => {
+            if (compareOrcaHls && videoEl.buffered.length > 0) {
+              const bufferedEnd = videoEl.buffered.end(videoEl.buffered.length - 1);
+              const bufferAhead = bufferedEnd - videoEl.currentTime;
+              const bufferEl = document.getElementById('orca-buffer');
+              bufferEl.textContent = bufferAhead.toFixed(1) + 's';
+              bufferEl.className = bufferAhead > 5 ? 'stat-value fast' : 'stat-value neutral';
+            }
+          }, 1000);
+        });
+
+        compareOrcaHls.on(Hls.Events.ERROR, (event, data) => {
+          if (data.fatal) {
+            document.getElementById('orca-status').textContent = 'Error';
+            document.getElementById('orca-status').className = 'stat-value slow';
+          }
+        });
+
+        videoEl.addEventListener('playing', () => {
+          if (!orcaFirstFrameTime) {
+            orcaFirstFrameTime = performance.now() - startTime;
+            const latency = orcaFirstFrameTime.toFixed(0);
+            document.getElementById('orca-first-frame').textContent = latency + 'ms';
+            document.getElementById('orca-first-frame').className = 'stat-value fast';
+          }
+        }, { once: true });
+
+      } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+        videoEl.src = manifestUrl;
+        videoEl.addEventListener('loadedmetadata', () => {
+          document.getElementById('orca-status').textContent = 'Playing';
+          document.getElementById('orca-status').className = 'stat-value fast';
+          videoEl.play().catch(() => {});
+        });
+        videoEl.addEventListener('playing', () => {
+          if (!orcaFirstFrameTime) {
+            orcaFirstFrameTime = performance.now() - startTime;
+            document.getElementById('orca-first-frame').textContent = orcaFirstFrameTime.toFixed(0) + 'ms';
+          }
+        }, { once: true });
+      }
+    }
+
+    function simulateWalrusDemo(videoEl, id) {
+      // Simulate Walrus blob ID
+      const simulatedBlobId = '0x' + Array.from({length: 64}, () => 
+        Math.floor(Math.random() * 16).toString(16)
+      ).join('').slice(0, 16) + '...';
+      
+      document.getElementById('walrus-blob-id').textContent = simulatedBlobId;
+
+      // For demo purposes, use the same Orca manifest but simulate higher latency
+      // In a real implementation, this would fetch from Walrus Aggregator
+      const simulatedManifest = window.location.origin + '/stream/' + encodeURIComponent(id) + '/index.m3u8';
+      
+      // Simulate initial loading delay (like fetching from decentralized storage)
+      setTimeout(() => {
+        if (Hls.isSupported()) {
+          compareWalrusHls = new Hls({
+            enableWorker: true,
+            lowLatencyMode: false // Walrus typically has higher latency
+          });
+
+          compareWalrusHls.loadSource(simulatedManifest);
+          compareWalrusHls.attachMedia(videoEl);
+
+          compareWalrusHls.on(Hls.Events.MANIFEST_PARSED, () => {
+            document.getElementById('walrus-status').textContent = 'Playing';
+            document.getElementById('walrus-status').className = 'stat-value';
+          });
+
+          videoEl.addEventListener('playing', () => {
+            if (!walrusSimulatedLatency) {
+              // Simulate 2-5s initial latency for decentralized storage
+              walrusSimulatedLatency = 2000 + Math.random() * 3000;
+              document.getElementById('walrus-first-frame').textContent = 
+                walrusSimulatedLatency.toFixed(0) + 'ms (sim)';
+            }
+          }, { once: true });
+
+          videoEl.play().catch(() => {});
+
+          // Track buffer health for Walrus (typically less buffered due to latency)
+          setInterval(() => {
+            if (compareWalrusHls && videoEl.buffered.length > 0) {
+              const bufferedEnd = videoEl.buffered.end(videoEl.buffered.length - 1);
+              const bufferAhead = bufferedEnd - videoEl.currentTime;
+              const bufferEl = document.getElementById('walrus-buffer');
+              if (bufferEl) {
+                bufferEl.textContent = bufferAhead.toFixed(1) + 's';
+              }
+            }
+          }, 1000);
+
+        } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+          videoEl.src = simulatedManifest;
+          videoEl.play().catch(() => {});
+        }
+      }, 1500 + Math.random() * 1000); // Simulate 1.5-2.5s network delay
+    }
+
+    function simulateSeek(type) {
+      const videoEl = type === 'orca' 
+        ? document.getElementById('compare-orca-video')
+        : document.getElementById('compare-walrus-video');
+      const latencyEl = document.getElementById(type + '-seek-latency');
+
+      if (!videoEl.duration) return;
+
+      const startTime = performance.now();
+      const targetTime = videoEl.duration * (0.3 + Math.random() * 0.4);
+
+      videoEl.currentTime = targetTime;
+
+      const seekHandler = () => {
+        const latency = performance.now() - startTime;
+        latencyEl.textContent = latency.toFixed(0) + 'ms';
+        latencyEl.className = type === 'orca' 
+          ? (latency < 500 ? 'stat-value fast' : 'stat-value')
+          : (latency < 2000 ? 'stat-value fast' : 'stat-value');
+        videoEl.removeEventListener('seeked', seekHandler);
+      };
+
+      videoEl.addEventListener('seeked', seekHandler);
+
+      // For Walrus, simulate higher seek latency
+      if (type === 'walrus') {
+        latencyEl.textContent = '~' + (3000 + Math.random() * 5000).toFixed(0) + 'ms (sim)';
+        latencyEl.className = 'stat-value neutral';
+      }
+    }
   </script>
 </body>
 </html>
