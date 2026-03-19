@@ -36,6 +36,11 @@ func (h *WalrusBlob) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Forward Range header if present
+	if rangeHeader := r.Header.Get("Range"); rangeHeader != "" {
+		req.Header.Set("Range", rangeHeader)
+	}
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		http.Error(w, "failed to fetch blob: "+err.Error(), http.StatusBadGateway)
@@ -43,18 +48,13 @@ func (h *WalrusBlob) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		http.Error(w, fmt.Sprintf("walrus error %d: %s", resp.StatusCode, string(body)), resp.StatusCode)
-		return
-	}
-
+	// Forward important headers
 	for k, v := range resp.Header {
-		if k == "Content-Type" || k == "Content-Length" || k == "Cache-Control" {
+		if k == "Content-Type" || k == "Content-Length" || k == "Cache-Control" || k == "Content-Range" || k == "Accept-Ranges" {
 			w.Header().Set(k, v[0])
 		}
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(resp.StatusCode)
 	io.Copy(w, resp.Body)
 }

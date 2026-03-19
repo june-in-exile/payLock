@@ -22,6 +22,34 @@ import (
 //go:embed web
 var webFS embed.FS
 
+func scanStorage(store *storage.LocalStorage, videos *model.VideoStore) {
+	ids, err := store.List()
+	if err != nil {
+		slog.Warn("failed to scan storage directory", "error", err)
+		return
+	}
+	for _, id := range ids {
+		dir := store.OutputDir(id)
+		info, err := os.Stat(dir)
+		var t time.Time
+		if err == nil {
+			t = info.ModTime().UTC()
+		} else {
+			t = time.Now().UTC()
+		}
+		if store.HasManifest(id) {
+			videos.Restore(id, model.StatusReady, t)
+			slog.Info("restored video", "id", id, "status", "ready")
+		} else if store.HasUpload(id) {
+			videos.Restore(id, model.StatusFailed, t)
+			slog.Info("restored video", "id", id, "status", "failed")
+		}
+	}
+	if len(ids) > 0 {
+		slog.Info("restored videos from storage", "count", len(ids))
+	}
+}
+
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -32,6 +60,8 @@ func main() {
 	store := storage.NewLocal(cfg.StorageDir)
 	proc := processor.New(cfg.FFmpegPath, cfg.FFprobePath)
 	videos := model.NewVideoStore()
+
+	scanStorage(store, videos)
 
 	mux := http.NewServeMux()
 

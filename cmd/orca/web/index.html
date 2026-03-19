@@ -608,7 +608,6 @@
     <nav>
       <a href="#videos" class="nav-link active" data-view="videos">Videos</a>
       <a href="#upload" class="nav-link" data-view="upload">Upload</a>
-      <a href="#compare" class="nav-link" data-view="compare">Compare</a>
     </nav>
   </header>
 
@@ -854,7 +853,7 @@ hls.<span class="function">loadSource</span>(manifest);
           window.location.hash = 'compare/' + params.id;
           loadCompareView(params.id);
         } else {
-          window.location.hash = 'compare';
+          navigate('videos');
         }
       }
     }
@@ -1259,7 +1258,11 @@ hls.<span class="function">loadSource</span>(manifest);
         const id = hash.slice(8);
         navigate('compare', { id: id });
       } else if (hash === 'compare') {
-        navigate('compare');
+        navigate('videos');
+      } else if (hash === 'videos' || hash === 'upload') {
+        navigate(hash);
+      } else {
+        navigate('videos');
       }
     }
 
@@ -1408,33 +1411,14 @@ hls.<span class="function">loadSource</span>(manifest);
 
     async function loadWalrusCompare(videoEl, blobId) {
       const startTime = performance.now();
-      let downloadDone = false;
       let firstFrameDone = false;
 
-      document.getElementById('walrus-status').textContent = 'Downloading...';
+      document.getElementById('walrus-status').textContent = 'Streaming...';
       document.getElementById('walrus-status').className = 'stat-value neutral';
 
       try {
-        const res = await fetch('/api/walrus/' + encodeURIComponent(blobId));
-
-        if (!res.ok) {
-          document.getElementById('walrus-status').textContent = 'Fetch failed';
-          document.getElementById('walrus-status').className = 'stat-value slow';
-          return;
-        }
-
-        const blob = await res.blob();
-
-        if (!downloadDone) {
-          downloadDone = true;
-          const dlLatency = performance.now() - startTime;
-          document.getElementById('walrus-dl-latency').textContent = dlLatency.toFixed(0) + 'ms';
-          document.getElementById('walrus-dl-latency').className =
-            dlLatency < 2000 ? 'stat-value fast' : 'stat-value';
-        }
-
-        const objectUrl = URL.createObjectURL(blob);
-        videoEl.src = objectUrl;
+        const streamUrl = '/api/walrus/' + encodeURIComponent(blobId);
+        videoEl.src = streamUrl;
 
         videoEl.addEventListener('loadedmetadata', () => {
           document.getElementById('walrus-status').textContent = 'Ready';
@@ -1448,9 +1432,17 @@ hls.<span class="function">loadSource</span>(manifest);
             const latency = performance.now() - startTime;
             document.getElementById('walrus-first-frame').textContent = latency.toFixed(0) + 'ms';
             document.getElementById('walrus-first-frame').className =
-              latency < 5000 ? 'stat-value fast' : 'stat-value';
+              latency < 2000 ? 'stat-value fast' : 'stat-value';
+            
+            // For raw MP4, download latency is effectively the time to start
+            document.getElementById('walrus-dl-latency').textContent = 'Streaming';
           }
         }, { once: true });
+
+        videoEl.addEventListener('error', () => {
+          document.getElementById('walrus-status').textContent = 'Error';
+          document.getElementById('walrus-status').className = 'stat-value slow';
+        });
 
       } catch (err) {
         document.getElementById('walrus-status').textContent = 'Error';
@@ -1467,7 +1459,8 @@ hls.<span class="function">loadSource</span>(manifest);
       if (!videoEl.duration) return;
 
       const startTime = performance.now();
-      const targetTime = videoEl.duration * (0.3 + Math.random() * 0.4);
+      // Seek to a random point between 10% and 90% of the video
+      const targetTime = videoEl.duration * (0.1 + Math.random() * 0.8);
 
       videoEl.currentTime = targetTime;
 
@@ -1475,18 +1468,12 @@ hls.<span class="function">loadSource</span>(manifest);
         const latency = performance.now() - startTime;
         latencyEl.textContent = latency.toFixed(0) + 'ms';
         latencyEl.className = type === 'orca' 
-          ? (latency < 500 ? 'stat-value fast' : 'stat-value')
+          ? (latency < 1000 ? 'stat-value fast' : 'stat-value')
           : (latency < 2000 ? 'stat-value fast' : 'stat-value');
         videoEl.removeEventListener('seeked', seekHandler);
       };
 
       videoEl.addEventListener('seeked', seekHandler);
-
-      // For Walrus, simulate higher seek latency
-      if (type === 'walrus') {
-        latencyEl.textContent = '~' + (3000 + Math.random() * 5000).toFixed(0) + 'ms (sim)';
-        latencyEl.className = 'stat-value neutral';
-      }
     }
   </script>
 </body>

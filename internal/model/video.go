@@ -49,6 +49,18 @@ func (s *VideoStore) CreateAt(id string, t time.Time) *Video {
 	return v
 }
 
+func (s *VideoStore) Restore(id string, status Status, t time.Time) *Video {
+	v := &Video{
+		ID:        id,
+		Status:    status,
+		CreatedAt: t.Format(time.RFC3339),
+	}
+	s.mu.Lock()
+	s.videos[id] = v
+	s.mu.Unlock()
+	return v
+}
+
 func (s *VideoStore) Get(id string) (*Video, bool) {
 	s.mu.RLock()
 	v, ok := s.videos[id]
