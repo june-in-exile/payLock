@@ -68,94 +68,63 @@
       font-weight: 600;
     }
 
-    /* Upload */
-    .upload-area {
-      border: 2px dashed var(--border);
-      border-radius: 12px;
-      padding: 3rem 2rem;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
-    }
-
-    .upload-area:hover, .upload-area.dragover {
-      border-color: var(--accent);
-      background: rgba(59, 130, 246, 0.05);
-    }
-
-    .upload-area p {
-      color: var(--text-muted);
-      margin-top: 0.5rem;
-      font-size: 0.9rem;
-    }
-
-    .upload-area .browse {
-      color: var(--accent);
-      text-decoration: underline;
-      cursor: pointer;
-    }
-
-    #upload-file { display: none; }
-
-    .upload-progress {
-      display: none;
-      margin-top: 1.5rem;
-    }
-
-    .upload-progress.active { display: block; }
-
-    .progress-bar {
-      width: 100%;
-      height: 6px;
-      background: var(--border);
-      border-radius: 3px;
-      overflow: hidden;
-      margin-bottom: 0.75rem;
-    }
-
-    .progress-bar .fill {
-      height: 100%;
+    /* Upload Overlay & FAB */
+    .fab {
+      width: 48px;
+      height: 48px;
       background: var(--accent);
-      border-radius: 3px;
-      transition: width 0.3s;
-      width: 0%;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      transition: transform 0.2s, background 0.2s;
+      border: none;
     }
 
-    .progress-text {
-      font-size: 0.85rem;
-      color: var(--text-muted);
+    .fab:hover {
+      background: var(--accent-hover);
+      transform: scale(1.05);
     }
 
-    .upload-result {
+    .upload-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 17, 23, 0.8);
+      backdrop-filter: blur(4px);
       display: none;
-      margin-top: 1.5rem;
-      padding: 1rem 1.25rem;
-      border-radius: 8px;
-      font-size: 0.9rem;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      border: 3px dashed var(--accent);
+      margin: 1rem;
+      border-radius: 20px;
+      pointer-events: none;
     }
 
-    .upload-result.success {
-      display: block;
-      background: rgba(34, 197, 94, 0.1);
-      border: 1px solid rgba(34, 197, 94, 0.3);
-      color: var(--success);
+    .upload-overlay.active {
+      display: flex;
     }
 
-    .upload-result.error {
-      display: block;
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      color: var(--error);
-    }
-
-    .upload-result a {
-      color: inherit;
-      text-decoration: underline;
+    .upload-overlay-text {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--accent);
     }
 
     /* API Key input */
     .api-key-section {
-      margin-bottom: 1.5rem;
+      margin-bottom: 2rem;
+      padding: 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
     }
 
     .api-key-section label {
@@ -167,13 +136,13 @@
 
     .api-key-wrapper {
       position: relative;
-      max-width: 400px;
+      max-width: 100%;
     }
 
     .api-key-section input {
       width: 100%;
-      padding: 0.5rem 2.5rem 0.5rem 0.75rem;
-      background: var(--surface);
+      padding: 0.6rem 2.5rem 0.6rem 0.75rem;
+      background: var(--bg);
       border: 1px solid var(--border);
       border-radius: 6px;
       color: var(--text);
@@ -519,111 +488,169 @@
       border-color: var(--accent);
     }
 
-    /* Dev Experience */
-    .dev-section {
-      margin-top: 2rem;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-    }
-
-    .dev-header {
-      padding: 1rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .dev-header h3 {
-      font-size: 1rem;
-      margin-bottom: 0.25rem;
-    }
-
-    .dev-header p {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
-
-    .dev-comparison {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0;
-    }
-
-    .dev-column {
-      padding: 1.25rem;
-    }
-
-    .dev-column:first-child {
-      border-right: 1px solid var(--border);
-    }
-
-    .dev-column h4 {
-      font-size: 0.9rem;
-      margin-bottom: 1rem;
+    /* Wallet */
+    .wallet-area {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.75rem;
     }
 
-    .dev-code {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 1rem;
-      font-family: monospace;
-      font-size: 0.75rem;
-      line-height: 1.6;
-      overflow-x: auto;
-    }
-
-    .dev-code .comment { color: var(--text-muted); }
-    .dev-code .keyword { color: #c678dd; }
-    .dev-code .string { color: #98c379; }
-    .dev-code .function { color: #61afef; }
-
-    .dev-pros {
-      margin-top: 1rem;
+    .wallet-btn {
+      padding: 0.4rem 1rem;
+      border-radius: 8px;
       font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid;
     }
 
-    .dev-pros li {
-      margin-bottom: 0.5rem;
-      padding-left: 1rem;
+    .wallet-btn.connect {
+      background: rgba(168, 85, 247, 0.15);
+      border-color: rgba(168, 85, 247, 0.4);
+      color: #a855f7;
+    }
+
+    .wallet-btn.connect:hover {
+      background: rgba(168, 85, 247, 0.25);
+      border-color: #a855f7;
+    }
+
+    .wallet-btn.connected {
+      background: rgba(34, 197, 94, 0.1);
+      border-color: rgba(34, 197, 94, 0.3);
+      color: var(--success);
       position: relative;
     }
 
-    .dev-pros li::before {
-      content: "✓";
-      position: absolute;
-      left: 0;
-      color: var(--success);
+    .wallet-btn.connected:hover {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.3);
+      color: var(--error);
     }
 
-    .dev-pros li.con::before { content: "✗"; color: var(--error); }
+    .wallet-info {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .wallet-balance {
+      font-family: monospace;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .wallet-addr {
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .wallet-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      display: inline-block;
+    }
+
+    .walrus-upload-section {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    .walrus-upload-section h3 {
+      font-size: 0.95rem;
+      margin-bottom: 0.75rem;
+      color: var(--text);
+    }
+
+    .walrus-upload-status {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+
+    .walrus-progress {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-top: 0.5rem;
+      overflow: hidden;
+    }
+
+    .walrus-progress .fill {
+      height: 100%;
+      background: #a855f7;
+      border-radius: 2px;
+      transition: width 0.3s;
+      width: 0%;
+    }
+
+    .btn-walrus {
+      padding: 0.4rem 1rem;
+      font-size: 0.85rem;
+      background: rgba(168, 85, 247, 0.15);
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      color: #a855f7;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-walrus:hover {
+      background: rgba(168, 85, 247, 0.25);
+      border-color: #a855f7;
+    }
+
+    .btn-walrus:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .wallet-required-msg {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: rgba(168, 85, 247, 0.08);
+      border: 1px solid rgba(168, 85, 247, 0.2);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: #a855f7;
+      margin-top: 0.5rem;
+    }
+
   </style>
 </head>
 <body>
   <header>
     <div class="logo">Orca</div>
-    <nav>
-      <a href="#videos" class="nav-link active" data-view="videos">Videos</a>
-      <a href="#upload" class="nav-link" data-view="upload">Upload</a>
-    </nav>
+    <div class="wallet-area">
+      <div id="wallet-status" class="wallet-info" style="display:none;">
+        <span class="wallet-dot"></span>
+        <span class="wallet-balance" id="wallet-balance">0 SUI</span>
+        <span class="wallet-addr" id="wallet-addr"></span>
+      </div>
+      <button class="wallet-btn connect" id="wallet-btn" onclick="window.walletConnect()">
+        Connect Wallet
+      </button>
+    </div>
   </header>
+
+  <div class="upload-overlay" id="upload-overlay">
+    <div class="upload-overlay-text">Drop MP4 to upload</div>
+  </div>
 
   <main>
     <!-- Videos list view -->
     <div id="view-videos" class="view active">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
-        <h2 style="margin-bottom:0;">Videos</h2>
-        <button class="refresh-btn" onclick="loadVideos()">Refresh</button>
-      </div>
-      <div id="video-list"></div>
-    </div>
-
-    <!-- Upload view -->
-    <div id="view-upload" class="view">
-      <h2>Upload Video</h2>
       <div class="api-key-section">
         <label for="api-key">API Key</label>
         <div class="api-key-wrapper">
@@ -636,17 +663,22 @@
           </button>
         </div>
       </div>
-      <div class="upload-area" id="upload-area">
-        <div style="font-size:2rem; margin-bottom:0.5rem;">&#x1F4C1;</div>
-        <p>Drag and drop an MP4 file here, or <span class="browse">browse</span></p>
-        <p style="font-size:0.8rem; margin-top:0.25rem;">Only .mp4 files are accepted</p>
-        <input type="file" id="upload-file" accept="video/mp4,.mp4">
-      </div>
+
       <div class="upload-progress" id="upload-progress">
         <div class="progress-bar"><div class="fill" id="progress-fill"></div></div>
         <div class="progress-text" id="progress-text">Uploading...</div>
       </div>
       <div class="upload-result" id="upload-result"></div>
+
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
+        <h2 style="margin-bottom:0;">Videos</h2>
+        <div style="display:flex; gap:0.75rem; align-items:center;">
+          <button class="refresh-btn" onclick="loadVideos()">Refresh</button>
+          <button class="fab" onclick="document.getElementById('upload-file').click()" title="Upload Video">+</button>
+          <input type="file" id="upload-file" accept="video/mp4,.mp4" style="display:none;">
+        </div>
+      </div>
+      <div id="video-list"></div>
     </div>
 
     <!-- Player view -->
@@ -737,71 +769,312 @@
         </div>
       </div>
 
-      <!-- Developer Experience Comparison -->
-      <div class="dev-section">
-        <div class="dev-header">
-          <h3>Developer Experience</h3>
-          <p>API usage comparison between Orca and Walrus</p>
-        </div>
-        <div class="dev-comparison">
-          <div class="dev-column">
-            <h4><span class="compare-badge orca">Orca</span></h4>
-            <div class="dev-code">
-<span class="comment">// 1. Upload video</span>
-<span class="keyword">const</span> res = <span class="keyword">await</span> fetch(<span class="string">'/api/upload'</span>, {
-  method: <span class="string">'POST'</span>,
-  headers: { <span class="string">'X-API-Key'</span>: key },
-  body: formData
-});
-<span class="keyword">const</span> { id } = <span class="keyword">await</span> res.json();
-
-<span class="comment">// 2. Get HLS manifest URL</span>
-<span class="keyword">const</span> manifest = 
-  <span class="string">`/stream/${id}/index.m3u8`</span>;
-
-<span class="comment">// 3. Play with hls.js</span>
-<span class="keyword">const</span> hls = <span class="keyword">new</span> <span class="function">Hls</span>();
-hls.<span class="function">loadSource</span>(manifest);
-            </div>
-            <ul class="dev-pros">
-              <li>Simple REST API</li>
-              <li>HLS ready out of box</li>
-              <li>Low latency streaming</li>
-              <li class="con">Centralized dependency</li>
-            </ul>
+      <div id="walrus-upload-section" class="walrus-upload-section" style="display:none;">
+        <h3>Upload to Walrus</h3>
+        <div id="walrus-upload-content">
+          <div id="walrus-wallet-gate" class="wallet-required-msg">
+            Connect your Slush wallet to upload this video to Walrus decentralized storage.
           </div>
-          <div class="dev-column">
-            <h4><span class="compare-badge walrus">Walrus</span></h4>
-            <div class="dev-code">
-<span class="comment">// 1. Upload to Walrus Publisher</span>
-<span class="keyword">const</span> res = <span class="keyword">await</span> fetch(<span class="string">'Publisher API'</span>, {
-  method: <span class="string">'POST'</span>,
-  body: videoBlob
-});
-<span class="keyword">const</span> { blobId } = <span class="keyword">await</span> res.json();
-
-<span class="comment">// 2. Fetch from Aggregator</span>
-<span class="keyword">const</span> manifest = 
-  <span class="string">`Aggregator/${blobId}/index.m3u8`</span>;
-
-<span class="comment">// 3. Need custom HLS handling</span>
-<span class="comment">// + blob mapping management</span>
+          <div id="walrus-upload-ready" style="display:none;">
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.75rem;">
+              Store this video on Walrus decentralized storage using your connected wallet.
+            </p>
+            <button class="btn-walrus" id="walrus-upload-btn" onclick="window.uploadToWalrusFromCompare()">
+              Upload to Walrus
+            </button>
+            <div class="walrus-progress" id="walrus-upload-progress" style="display:none;">
+              <div class="fill" id="walrus-progress-fill"></div>
             </div>
-            <ul class="dev-pros">
-              <li>Truly decentralized</li>
-              <li>No single point of failure</li>
-              <li>Global availability</li>
-              <li class="con">Higher latency</li>
-              <li class="con">Complex integration</li>
-              <li class="con">No native HLS support</li>
-            </ul>
+            <div class="walrus-upload-status" id="walrus-upload-status"></div>
           </div>
         </div>
       </div>
+
     </div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script type="module">
+    // --- Slush Wallet Integration ---
+    const WALRUS_PUBLISHER_URL = 'https://publisher.walrus-testnet.walrus.space';
+    const SUI_NETWORK = 'sui:testnet';
+
+    let connectedWallet = null;
+    let connectedAccount = null;
+    let suiClient = null;
+
+    async function initWallet() {
+      try {
+        const [slushMod, walletMod, suiMod] = await Promise.all([
+          import('https://esm.sh/@mysten/slush-wallet@0.3.1?bundle'),
+          import('https://esm.sh/@wallet-standard/app@1.1.0?bundle'),
+          import('https://esm.sh/@mysten/sui@1.21.1/client?bundle'),
+        ]);
+
+        const { registerSlushWallet } = slushMod;
+        const { getWallets } = walletMod;
+        const { SuiClient, getFullnodeUrl } = suiMod;
+
+        registerSlushWallet('Orca Video Streaming', {
+          origin: 'https://slush.app',
+        });
+
+        suiClient = new SuiClient({ url: getFullnodeUrl('testnet') });
+
+        window._walletStandard = { getWallets, SuiClient, getFullnodeUrl, suiClient };
+
+        // Check for previously connected wallet in session
+        const savedAddr = sessionStorage.getItem('orca_wallet_addr');
+        if (savedAddr) {
+          await autoReconnect();
+        }
+      } catch (err) {
+        const btn = document.getElementById('wallet-btn');
+        btn.textContent = 'Wallet Unavailable';
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'not-allowed';
+      }
+    }
+
+    async function autoReconnect() {
+      try {
+        const { getWallets } = window._walletStandard;
+        const { get } = getWallets();
+        const wallets = get();
+        const slush = wallets.find(w => w.name.toLowerCase().includes('slush'));
+        if (slush) {
+          const connectFeature = slush.features['standard:connect'];
+          const result = await connectFeature.connect({ silent: true });
+          if (result.accounts && result.accounts.length > 0) {
+            connectedWallet = slush;
+            connectedAccount = result.accounts[0];
+            await updateWalletUI();
+          }
+        }
+      } catch (_) {
+        sessionStorage.removeItem('orca_wallet_addr');
+      }
+    }
+
+    async function connectWallet() {
+      if (connectedWallet) {
+        await disconnectWallet();
+        return;
+      }
+
+      try {
+        const { getWallets } = window._walletStandard;
+        const { get } = getWallets();
+        const wallets = get();
+
+        const slush = wallets.find(w => w.name.toLowerCase().includes('slush'));
+        if (!slush) {
+          window.open('https://slush.app', '_blank');
+          return;
+        }
+
+        const connectFeature = slush.features['standard:connect'];
+        const result = await connectFeature.connect();
+
+        if (result.accounts.length > 0) {
+          connectedWallet = slush;
+          connectedAccount = result.accounts[0];
+          sessionStorage.setItem('orca_wallet_addr', connectedAccount.address);
+          await updateWalletUI();
+        }
+      } catch (err) {
+        const btn = document.getElementById('wallet-btn');
+        btn.textContent = 'Connection Failed';
+        setTimeout(() => { btn.textContent = 'Connect Wallet'; }, 2000);
+      }
+    }
+
+    async function disconnectWallet() {
+      if (connectedWallet) {
+        try {
+          const disconnectFeature = connectedWallet.features['standard:disconnect'];
+          if (disconnectFeature) {
+            await disconnectFeature.disconnect();
+          }
+        } catch (_) {}
+      }
+      connectedWallet = null;
+      connectedAccount = null;
+      sessionStorage.removeItem('orca_wallet_addr');
+
+      const btn = document.getElementById('wallet-btn');
+      btn.textContent = 'Connect Wallet';
+      btn.className = 'wallet-btn connect';
+      document.getElementById('wallet-status').style.display = 'none';
+
+      updateWalrusUploadGate();
+    }
+
+    async function updateWalletUI() {
+      const btn = document.getElementById('wallet-btn');
+      const statusEl = document.getElementById('wallet-status');
+      const balanceEl = document.getElementById('wallet-balance');
+      const addrEl = document.getElementById('wallet-addr');
+
+      if (!connectedAccount) return;
+
+      const addr = connectedAccount.address;
+      const shortAddr = addr.slice(0, 6) + '...' + addr.slice(-4);
+
+      btn.textContent = 'Disconnect';
+      btn.className = 'wallet-btn connected';
+
+      addrEl.textContent = shortAddr;
+      statusEl.style.display = 'flex';
+
+      // Fetch SUI balance
+      try {
+        const balance = await suiClient.getBalance({ owner: addr });
+        const suiAmount = (Number(balance.totalBalance) / 1_000_000_000).toFixed(4);
+        balanceEl.textContent = suiAmount + ' SUI';
+      } catch (_) {
+        balanceEl.textContent = '-- SUI';
+      }
+
+      updateWalrusUploadGate();
+    }
+
+    function updateWalrusUploadGate() {
+      const gateEl = document.getElementById('walrus-wallet-gate');
+      const readyEl = document.getElementById('walrus-upload-ready');
+      if (!gateEl || !readyEl) return;
+
+      if (connectedAccount) {
+        gateEl.style.display = 'none';
+        readyEl.style.display = 'block';
+      } else {
+        gateEl.style.display = 'flex';
+        readyEl.style.display = 'none';
+      }
+    }
+
+    async function uploadToWalrusFromCompare() {
+      const videoId = window._compareVideoId;
+      if (!videoId || !connectedAccount) return;
+
+      const btn = document.getElementById('walrus-upload-btn');
+      const statusEl = document.getElementById('walrus-upload-status');
+      const progressEl = document.getElementById('walrus-upload-progress');
+      const fillEl = document.getElementById('walrus-progress-fill');
+
+      btn.disabled = true;
+      btn.textContent = 'Uploading...';
+      statusEl.textContent = 'Fetching video from server...';
+      progressEl.style.display = 'block';
+      fillEl.style.width = '10%';
+
+      try {
+        // Step 1: Fetch the original MP4 from the local stream
+        const apiKey = localStorage.getItem('orca_api_key') || '';
+        const statusRes = await fetch('/api/status/' + encodeURIComponent(videoId), {
+          headers: { 'X-API-Key': apiKey }
+        });
+        if (!statusRes.ok) throw new Error('Failed to get video status');
+        const videoData = await statusRes.json();
+
+        // If already on Walrus, skip
+        if (videoData.walrus_blob_id) {
+          statusEl.textContent = 'Already on Walrus: ' + videoData.walrus_blob_id;
+          btn.disabled = false;
+          btn.textContent = 'Upload to Walrus';
+          progressEl.style.display = 'none';
+          return;
+        }
+
+        fillEl.style.width = '20%';
+        statusEl.textContent = 'Downloading video for Walrus upload...';
+
+        // Fetch the MP4 file from Orca stream
+        const mp4Res = await fetch('/stream/' + encodeURIComponent(videoId) + '/upload.mp4');
+        if (!mp4Res.ok) throw new Error('Failed to fetch video file');
+        const mp4Data = await mp4Res.arrayBuffer();
+
+        fillEl.style.width = '40%';
+        statusEl.textContent = 'Uploading to Walrus (' + (mp4Data.byteLength / 1024 / 1024).toFixed(1) + ' MB)...';
+
+        // Step 2: Upload to Walrus Publisher API
+        const walrusRes = await fetch(WALRUS_PUBLISHER_URL + '/v1/blobs', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: mp4Data,
+        });
+
+        if (!walrusRes.ok) {
+          const errText = await walrusRes.text();
+          throw new Error('Walrus upload failed: ' + errText);
+        }
+
+        fillEl.style.width = '80%';
+        statusEl.textContent = 'Processing Walrus response...';
+
+        const walrusResult = await walrusRes.json();
+        let blobId = null;
+
+        if (walrusResult.newlyCreated) {
+          blobId = walrusResult.newlyCreated?.blobObject?.blobId ?? null;
+        } else if (walrusResult.alreadyCertified) {
+          blobId = walrusResult.alreadyCertified?.blobId ?? null;
+        }
+
+        if (!blobId) throw new Error('No blob ID in Walrus response');
+
+        fillEl.style.width = '90%';
+        statusEl.textContent = 'Registering blob ID with Orca...';
+
+        // Step 3: Report blob ID to backend
+        const setRes = await fetch('/api/videos/' + encodeURIComponent(videoId) + '/walrus', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': apiKey,
+          },
+          body: JSON.stringify({ blob_id: blobId }),
+        });
+
+        if (!setRes.ok) throw new Error('Failed to register blob ID');
+
+        fillEl.style.width = '100%';
+        statusEl.textContent = 'Stored on Walrus! Blob ID: ' + blobId;
+        statusEl.style.color = 'var(--success)';
+
+        // Update compare view
+        document.getElementById('walrus-blob-id').textContent = blobId;
+        const walrusVideo = document.getElementById('compare-walrus-video');
+        if (typeof window.loadWalrusCompare === 'function') {
+          window.loadWalrusCompare(walrusVideo, blobId);
+        }
+
+        // Hide the upload section after success
+        setTimeout(() => {
+          document.getElementById('walrus-upload-section').style.display = 'none';
+        }, 3000);
+
+      } catch (err) {
+        statusEl.textContent = 'Error: ' + err.message;
+        statusEl.style.color = 'var(--error)';
+        fillEl.style.width = '0%';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Upload to Walrus';
+      }
+    }
+
+    // Expose functions to non-module scripts
+    window.walletConnect = connectWallet;
+    window.uploadToWalrusFromCompare = uploadToWalrusFromCompare;
+    window.isWalletConnected = () => !!connectedAccount;
+    window.getWalletAddress = () => connectedAccount ? connectedAccount.address : null;
+    window.updateWalrusUploadGate = updateWalrusUploadGate;
+
+    // Initialize wallet on load
+    initWallet();
+  </script>
   <script>
     // State
     let currentView = 'videos';
@@ -809,9 +1082,10 @@ hls.<span class="function">loadSource</span>(manifest);
     let navGeneration = 0;
     let compareOrcaHls = null;
     let compareWalrusHls = null;
+    let bufferPollInterval = null;
 
     // Navigation
-    function navigate(view, params) {
+    function navigate(view, params, push = true) {
       navGeneration++;
       currentView = view;
 
@@ -822,6 +1096,10 @@ hls.<span class="function">loadSource</span>(manifest);
       }
 
       // Clean up compare players if they exist
+      if (bufferPollInterval) {
+        clearInterval(bufferPollInterval);
+        bufferPollInterval = null;
+      }
       if (compareOrcaHls) {
         compareOrcaHls.destroy();
         compareOrcaHls = null;
@@ -835,35 +1113,21 @@ hls.<span class="function">loadSource</span>(manifest);
       const viewEl = document.getElementById('view-' + view);
       if (viewEl) viewEl.classList.add('active');
       
-      document.querySelectorAll('.nav-link').forEach(a => {
-        a.classList.toggle('active', a.dataset.view === view);
-      });
-
       if (view === 'videos') {
         loadVideos();
-        window.location.hash = 'videos';
-      } else if (view === 'upload') {
-        resetUploadView();
-        window.location.hash = 'upload';
+        if (push) history.pushState({view}, '', '/');
       } else if (view === 'player' && params && params.id) {
-        window.location.hash = 'play/' + params.id;
+        if (push) history.pushState({view, id: params.id}, '', '/play/' + params.id);
         loadPlayer(params.id);
       } else if (view === 'compare') {
         if (params && params.id) {
-          window.location.hash = 'compare/' + params.id;
+          if (push) history.pushState({view, id: params.id}, '', '/' + params.id);
           loadCompareView(params.id);
         } else {
-          navigate('videos');
+          navigate('videos', null, push);
         }
       }
     }
-
-    document.querySelectorAll('.nav-link').forEach(a => {
-      a.addEventListener('click', (e) => {
-        e.preventDefault();
-        navigate(a.dataset.view);
-      });
-    });
 
     // API Key persistence & toggle
     const apiKeyInput = document.getElementById('api-key');
@@ -967,21 +1231,13 @@ hls.<span class="function">loadSource</span>(manifest);
       return card;
     }
 
-    function setEmptyState(container, message, showUploadLink) {
+    function setEmptyState(container, message) {
       container.textContent = '';
       const wrapper = document.createElement('div');
       wrapper.className = 'empty-state';
       const p = document.createElement('p');
       p.textContent = message;
       wrapper.appendChild(p);
-      if (showUploadLink) {
-        const btn = document.createElement('a');
-        btn.className = 'btn';
-        btn.href = '#upload';
-        btn.textContent = 'Upload your first video';
-        btn.addEventListener('click', (e) => { e.preventDefault(); navigate('upload'); });
-        wrapper.appendChild(btn);
-      }
       container.appendChild(wrapper);
     }
 
@@ -992,14 +1248,14 @@ hls.<span class="function">loadSource</span>(manifest);
           headers: { 'X-API-Key': getApiKey() }
         });
         if (!res.ok) {
-          setEmptyState(container, 'Failed to load videos. Check your API key.', false);
+          setEmptyState(container, 'Failed to load videos. Check your API key.');
           return;
         }
         const data = await res.json();
         const videos = data.videos || [];
 
         if (videos.length === 0) {
-          setEmptyState(container, 'No videos yet.', true);
+          setEmptyState(container, 'No videos yet. Drag and drop a file or click + to upload.');
           return;
         }
 
@@ -1009,32 +1265,31 @@ hls.<span class="function">loadSource</span>(manifest);
         videos.forEach(v => grid.appendChild(createVideoCard(v)));
         container.appendChild(grid);
       } catch (err) {
-        setEmptyState(container, 'Cannot connect to server.', false);
+        setEmptyState(container, 'Cannot connect to server.');
       }
     }
 
     // Upload
-    const uploadArea = document.getElementById('upload-area');
+    const uploadOverlay = document.getElementById('upload-overlay');
     const uploadFile = document.getElementById('upload-file');
     const uploadProgress = document.getElementById('upload-progress');
     const progressFill = document.getElementById('progress-fill');
     const progressText = document.getElementById('progress-text');
     const uploadResult = document.getElementById('upload-result');
 
-    uploadArea.addEventListener('click', () => uploadFile.click());
-
-    uploadArea.addEventListener('dragover', (e) => {
+    window.addEventListener('dragover', (e) => {
       e.preventDefault();
-      uploadArea.classList.add('dragover');
+      uploadOverlay.classList.add('active');
     });
 
-    uploadArea.addEventListener('dragleave', () => {
-      uploadArea.classList.remove('dragover');
+    uploadOverlay.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      uploadOverlay.classList.remove('active');
     });
 
-    uploadArea.addEventListener('drop', (e) => {
+    window.addEventListener('drop', (e) => {
       e.preventDefault();
-      uploadArea.classList.remove('dragover');
+      uploadOverlay.classList.remove('active');
       if (e.dataTransfer.files.length > 0) {
         handleFile(e.dataTransfer.files[0]);
       }
@@ -1070,6 +1325,10 @@ hls.<span class="function">loadSource</span>(manifest);
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/api/upload');
       xhr.setRequestHeader('X-API-Key', apiKey);
+      // When wallet is connected, tell backend to skip Walrus upload (frontend handles it)
+      if (typeof window.isWalletConnected === 'function' && window.isWalletConnected()) {
+        xhr.setRequestHeader('X-Walrus-Client', 'true');
+      }
 
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
@@ -1103,15 +1362,7 @@ hls.<span class="function">loadSource</span>(manifest);
     function showResult(type, message) {
       uploadResult.className = 'upload-result ' + type;
       uploadResult.textContent = message;
-    }
-
-    function resetUploadView() {
-      uploadArea.style.display = '';
-      document.querySelector('.api-key-section').style.display = '';
-      uploadResult.className = 'upload-result';
-      uploadResult.style.display = 'none';
-      uploadProgress.classList.remove('active');
-      uploadFile.value = '';
+      uploadResult.style.display = 'block';
     }
 
     // Player
@@ -1250,23 +1501,22 @@ hls.<span class="function">loadSource</span>(manifest);
 
     // Router
     function handleRoute() {
-      const hash = window.location.hash.slice(1) || 'videos';
-      if (hash.startsWith('play/')) {
-        const id = hash.slice(5);
-        navigate('player', { id: id });
-      } else if (hash.startsWith('compare/')) {
-        const id = hash.slice(8);
-        navigate('compare', { id: id });
-      } else if (hash === 'compare') {
-        navigate('videos');
-      } else if (hash === 'videos' || hash === 'upload') {
-        navigate(hash);
+      const path = window.location.pathname;
+      if (path === '/') {
+        navigate('videos', null, false);
+      } else if (path.startsWith('/play/')) {
+        const id = path.slice(6);
+        navigate('player', { id: id }, false);
+      } else if (path.length > 1) {
+        // Assume it's /{id} for compare
+        const id = path.slice(1);
+        navigate('compare', { id: id }, false);
       } else {
-        navigate('videos');
+        navigate('videos', null, false);
       }
     }
 
-    window.addEventListener('hashchange', handleRoute);
+    window.addEventListener('popstate', handleRoute);
     handleRoute();
 
     // Compare View
@@ -1280,6 +1530,7 @@ hls.<span class="function">loadSource</span>(manifest);
 
     async function loadCompareView(id) {
       compareVideoId = id;
+      window._compareVideoId = id;
       orcaFirstFrameTime = null;
 
       // Clean up previous players
@@ -1336,10 +1587,18 @@ hls.<span class="function">loadSource</span>(manifest);
         if (video.walrus_blob_id) {
           document.getElementById('walrus-blob-id').textContent = video.walrus_blob_id;
           loadWalrusCompare(walrusVideo, video.walrus_blob_id);
+          document.getElementById('walrus-upload-section').style.display = 'none';
         } else {
           document.getElementById('walrus-status').textContent = 'Not on Walrus';
           document.getElementById('walrus-status').className = 'stat-value neutral';
           document.getElementById('walrus-blob-id').textContent = 'Not uploaded';
+          // Show upload section for wallet-based Walrus upload
+          document.getElementById('walrus-upload-section').style.display = 'block';
+          document.getElementById('walrus-upload-status').textContent = '';
+          document.getElementById('walrus-upload-status').style.color = '';
+          if (typeof window.updateWalrusUploadGate === 'function') {
+            window.updateWalrusUploadGate();
+          }
         }
 
       } catch (err) {
@@ -1366,7 +1625,7 @@ hls.<span class="function">loadSource</span>(manifest);
           videoEl.play().catch(() => {});
 
           // Track buffer health
-          setInterval(() => {
+          bufferPollInterval = setInterval(() => {
             if (compareOrcaHls && videoEl.buffered.length > 0) {
               const bufferedEnd = videoEl.buffered.end(videoEl.buffered.length - 1);
               const bufferAhead = bufferedEnd - videoEl.currentTime;
@@ -1409,6 +1668,7 @@ hls.<span class="function">loadSource</span>(manifest);
       }
     }
 
+    window.loadWalrusCompare = loadWalrusCompare;
     async function loadWalrusCompare(videoEl, blobId) {
       const startTime = performance.now();
       let firstFrameDone = false;

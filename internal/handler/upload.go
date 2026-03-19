@@ -82,7 +82,9 @@ func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	go h.processVideo(id, filePath)
 
-	if h.walrus != nil {
+	// Skip backend Walrus upload when frontend handles it via wallet
+	clientHandlesWalrus := r.Header.Get("X-Walrus-Client") == "true"
+	if h.walrus != nil && !clientHandlesWalrus {
 		go h.uploadToWalrus(id, data)
 	}
 

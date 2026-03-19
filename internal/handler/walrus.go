@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 
 	"github.com/anthropics/orca/internal/config"
 )
+
+var validBlobID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
 
 type WalrusBlob struct {
 	aggregatorURL string
@@ -23,8 +26,8 @@ func (h *WalrusBlob) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	blobID := r.PathValue("blobId")
-	if blobID == "" {
-		http.Error(w, "missing blob ID", http.StatusBadRequest)
+	if blobID == "" || !validBlobID.MatchString(blobID) {
+		http.Error(w, "invalid blob ID", http.StatusBadRequest)
 		return
 	}
 

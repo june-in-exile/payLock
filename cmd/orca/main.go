@@ -72,6 +72,7 @@ func main() {
 
 	// Video list
 	mux.Handle("GET /api/videos", apiAuth(handler.NewVideos(videos)))
+	mux.Handle("PUT /api/videos/{id}/walrus", apiAuth(handler.NewWalrusSet(videos)))
 	mux.Handle("GET /api/walrus/{blobId}", handler.NewWalrusBlob(cfg))
 
 	// Stream routes (with CORS)
@@ -84,7 +85,23 @@ func main() {
 		slog.Error("failed to create web filesystem", "error", err)
 		os.Exit(1)
 	}
-	mux.Handle("GET /", http.FileServer(http.FS(webSub)))
+	// Serve index.html for all other routes to support SPA path-based routing
+	fileServer := http.FileServer(http.FS(webSub))
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		// If it's a file with an extension, or it exists in the filesystem, serve it
+		path := r.URL.Path
+		if path != "/" {
+			_, err := fs.Stat(webSub, path[1:])
+			if err == nil {
+				fileServer.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		// Otherwise serve index.html
+		r.URL.Path = "/"
+		fileServer.ServeHTTP(w, r)
+	})
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
