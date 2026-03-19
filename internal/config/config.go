@@ -10,12 +10,14 @@ import (
 )
 
 type Config struct {
-	Port        string
-	StorageDir  string
-	APIKey      string
-	MaxFileSize int64
-	FFmpegPath  string
-	FFprobePath string
+	Port             string
+	StorageDir       string
+	APIKey           string
+	MaxFileSize      int64
+	FFmpegPath       string
+	FFprobePath      string
+	WalrusPublisher  string
+	WalrusAggregator string
 }
 
 func Load() (*Config, error) {
@@ -23,12 +25,14 @@ func Load() (*Config, error) {
 	_ = godotenv.Load()
 
 	cfg := &Config{
-		Port:        envOrDefault("ORCA_PORT", "8080"),
-		StorageDir:  envOrDefault("ORCA_STORAGE_DIR", "./storage"),
-		APIKey:      os.Getenv("ORCA_API_KEY"),
-		MaxFileSize: 500 * 1024 * 1024, // 500MB
-		FFmpegPath:  envOrDefault("ORCA_FFMPEG_PATH", "ffmpeg"),
-		FFprobePath: envOrDefault("ORCA_FFPROBE_PATH", "ffprobe"),
+		Port:             envOrDefault("ORCA_PORT", "8080"),
+		StorageDir:       envOrDefault("ORCA_STORAGE_DIR", "./storage"),
+		APIKey:           os.Getenv("ORCA_API_KEY"),
+		MaxFileSize:      500 * 1024 * 1024, // 500MB
+		FFmpegPath:       envOrDefault("ORCA_FFMPEG_PATH", "ffmpeg"),
+		FFprobePath:      envOrDefault("ORCA_FFPROBE_PATH", "ffprobe"),
+		WalrusPublisher:  envOrDefault("ORCA_WALRUS_PUBLISHER_URL", "https://publisher.walrus-testnet.walrus.space"),
+		WalrusAggregator: envOrDefault("ORCA_WALRUS_AGGREGATOR_URL", "https://aggregator.walrus-testnet.walrus.space"),
 	}
 
 	if v := os.Getenv("ORCA_MAX_FILE_SIZE_MB"); v != "" {

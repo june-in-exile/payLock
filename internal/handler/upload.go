@@ -14,6 +14,7 @@ import (
 	"github.com/anthropics/orca/internal/model"
 	"github.com/anthropics/orca/internal/processor"
 	"github.com/anthropics/orca/internal/storage"
+	"github.com/anthropics/orca/internal/walrus"
 )
 
 type Upload struct {
@@ -21,14 +22,18 @@ type Upload struct {
 	proc   *processor.Processor
 	videos *model.VideoStore
 	cfg    *config.Config
+	walrus *walrus.Client
 }
 
 func NewUpload(store storage.Backend, proc *processor.Processor, videos *model.VideoStore, cfg *config.Config) *Upload {
-	return &Upload{store: store, proc: proc, videos: videos, cfg: cfg}
+	var wc *walrus.Client
+	if cfg.WalrusPublisher != "" && cfg.WalrusAggregator != "" {
+		wc = walrus.NewClient(cfg.WalrusPublisher, cfg.WalrusAggregator)
+	}
+	return &Upload{store: store, proc: proc, videos: videos, cfg: cfg, walrus: wc}
 }
 
 func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Limit request body size
 	r.Body = http.MaxBytesReader(w, r.Body, h.cfg.MaxFileSize)
 
 	file, header, err := r.FormFile("video")
@@ -40,7 +45,6 @@ func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Validate file size
 	if err := processor.ValidateSize(header.Size, h.cfg.MaxFileSize); err != nil {
 		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{
 			"error": err.Error(),
@@ -48,29 +52,24 @@ func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Read header bytes for magic byte validation
-	headerBytes := make([]byte, 12)
-	n, err := io.ReadFull(file, headerBytes)
-	if err != nil || n < 8 {
+	data, err := io.ReadAll(file)
+	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": "file too small or unreadable",
+			"error": "failed to read video file",
 		})
 		return
 	}
 
-	if err := processor.ValidateMagicBytes(bytes.NewReader(headerBytes[:n])); err != nil {
+	if err := processor.ValidateMagicBytes(bytes.NewReader(data)); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{
 			"error": "invalid file format: only MP4 files are accepted",
 		})
 		return
 	}
 
-	// Generate video ID
 	id := generateID()
 
-	// Stream file to disk: prepend the already-read header bytes
-	reader := io.MultiReader(bytes.NewReader(headerBytes[:n]), file)
-	filePath, err := h.store.SaveUpload(id, reader)
+	filePath, err := h.store.SaveUpload(id, bytes.NewReader(data))
 	if err != nil {
 		slog.Error("failed to save upload", "id", id, "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{
@@ -79,10 +78,13 @@ func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Register video and start background processing
 	h.videos.Create(id)
 
 	go h.processVideo(id, filePath)
+
+	if h.walrus != nil {
+		go h.uploadToWalrus(id, data)
+	}
 
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"id":     id,
@@ -93,7 +95,6 @@ func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *Upload) processVideo(id, filePath string) {
 	ctx := context.Background()
 
-	// Validate with ffprobe
 	duration, err := h.proc.Probe(filePath)
 	if err != nil {
 		slog.Error("ffprobe validation failed", "id", id, "error", err)
@@ -101,7 +102,6 @@ func (h *Upload) processVideo(id, filePath string) {
 		return
 	}
 
-	// Segment with ffmpeg
 	outputDir := h.store.OutputDir(id)
 	if err := h.proc.Segment(ctx, filePath, outputDir); err != nil {
 		slog.Error("ffmpeg segmentation failed", "id", id, "error", err)
@@ -111,6 +111,16 @@ func (h *Upload) processVideo(id, filePath string) {
 
 	h.videos.SetReady(id, duration)
 	slog.Info("video ready", "id", id, "duration", duration)
+}
+
+func (h *Upload) uploadToWalrus(id string, data []byte) {
+	blobID, err := h.walrus.Store(data)
+	if err != nil {
+		slog.Error("walrus upload failed", "id", id, "error", err)
+		return
+	}
+	h.videos.SetWalrusBlobID(id, blobID)
+	slog.Info("walrus upload succeeded", "id", id, "blob_id", blobID)
 }
 
 func generateID() string {

@@ -218,13 +218,11 @@
       border: 1px solid var(--border);
       border-radius: 10px;
       overflow: hidden;
-      cursor: pointer;
-      transition: border-color 0.2s, transform 0.2s;
+      transition: border-color 0.2s;
     }
 
     .video-card:hover {
       border-color: var(--accent);
-      transform: translateY(-2px);
     }
 
     .video-thumb {
@@ -291,6 +289,26 @@
     }
 
     .btn:hover { background: var(--accent-hover); }
+
+    .btn-sm {
+      padding: 0.25rem 0.6rem;
+      font-size: 0.75rem;
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-outline:hover { background: rgba(59, 130, 246, 0.1); }
+
+    .video-actions {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      border-top: 1px solid var(--border);
+    }
 
     /* Player */
     .player-container {
@@ -695,19 +713,23 @@
           <div class="compare-stats" id="walrus-stats">
             <div class="stat-row">
               <span class="stat-label">Status</span>
-              <span class="stat-value" id="walrus-status">Simulated</span>
+              <span class="stat-value" id="walrus-status">--</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Download Latency</span>
+              <span class="stat-value" id="walrus-dl-latency">--</span>
             </div>
             <div class="stat-row">
               <span class="stat-label">First Frame Latency</span>
-              <span class="stat-value" id="walrus-first-frame">~2-5s</span>
+              <span class="stat-value" id="walrus-first-frame">--</span>
             </div>
             <div class="stat-row">
               <span class="stat-label">Seek Latency</span>
-              <span class="stat-value" id="walrus-seek-latency">~3-8s</span>
+              <span class="stat-value" id="walrus-seek-latency">--</span>
             </div>
             <div class="stat-row">
               <span class="stat-label">Blob ID</span>
-              <span class="stat-value" id="walrus-blob-id" style="font-size:0.75rem;">Pending...</span>
+              <span class="stat-value" id="walrus-blob-id" style="font-size:0.75rem;">--</span>
             </div>
           </div>
           <div class="compare-actions">
@@ -880,11 +902,12 @@ hls.<span class="function">loadSource</span>(manifest);
     function createVideoCard(v) {
       const card = document.createElement('div');
       card.className = 'video-card';
-      card.addEventListener('click', () => navigate('player', { id: v.id }));
 
       const thumb = document.createElement('div');
       thumb.className = 'video-thumb';
       thumb.textContent = v.status === 'ready' ? '\u25B6' : '\u2026';
+      thumb.addEventListener('click', () => navigate('player', { id: v.id }));
+      thumb.style.cursor = 'pointer';
       card.appendChild(thumb);
 
       const info = document.createElement('div');
@@ -893,6 +916,8 @@ hls.<span class="function">loadSource</span>(manifest);
       const idEl = document.createElement('div');
       idEl.className = 'video-id';
       idEl.textContent = v.id;
+      idEl.style.cursor = 'pointer';
+      idEl.addEventListener('click', () => navigate('player', { id: v.id }));
       info.appendChild(idEl);
 
       const meta = document.createElement('div');
@@ -914,6 +939,32 @@ hls.<span class="function">loadSource</span>(manifest);
 
       info.appendChild(meta);
       card.appendChild(info);
+
+      if (v.status === 'ready') {
+        const actions = document.createElement('div');
+        actions.className = 'video-actions';
+
+        const playBtn = document.createElement('button');
+        playBtn.className = 'btn btn-sm';
+        playBtn.textContent = 'Play';
+        playBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          navigate('player', { id: v.id });
+        });
+        actions.appendChild(playBtn);
+
+        const compareBtn = document.createElement('button');
+        compareBtn.className = 'btn btn-sm btn-outline';
+        compareBtn.textContent = 'Compare';
+        compareBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          navigate('compare', { id: v.id });
+        });
+        actions.appendChild(compareBtn);
+
+        card.appendChild(actions);
+      }
+
       return card;
     }
 
@@ -1218,7 +1269,6 @@ hls.<span class="function">loadSource</span>(manifest);
     // Compare View
     let compareVideoId = null;
     let orcaFirstFrameTime = null;
-    let walrusSimulatedLatency = null;
 
     function goToCompare() {
       const id = document.getElementById('player-video-id').textContent;
@@ -1250,10 +1300,11 @@ hls.<span class="function">loadSource</span>(manifest);
       document.getElementById('orca-first-frame').textContent = '--';
       document.getElementById('orca-seek-latency').textContent = '--';
       document.getElementById('orca-buffer').textContent = '--';
-      document.getElementById('walrus-status').textContent = 'Simulated';
-      document.getElementById('walrus-first-frame').textContent = '~2-5s';
-      document.getElementById('walrus-seek-latency').textContent = '~3-8s';
-      document.getElementById('walrus-blob-id').textContent = 'Pending...';
+      document.getElementById('walrus-status').textContent = '--';
+      document.getElementById('walrus-dl-latency').textContent = '--';
+      document.getElementById('walrus-first-frame').textContent = '--';
+      document.getElementById('walrus-seek-latency').textContent = '--';
+      document.getElementById('walrus-blob-id').textContent = '--';
 
       try {
         const res = await fetch('/api/status/' + encodeURIComponent(id), {
@@ -1278,8 +1329,15 @@ hls.<span class="function">loadSource</span>(manifest);
         const orcaManifest = window.location.origin + '/stream/' + encodeURIComponent(id) + '/index.m3u8';
         startCompareOrca(orcaVideo, orcaManifest, video.id);
 
-        // Simulate Walrus (for now, use same manifest with delay)
-        simulateWalrusDemo(walrusVideo, video.id);
+        // Start Walrus playback (real)
+        if (video.walrus_blob_id) {
+          document.getElementById('walrus-blob-id').textContent = video.walrus_blob_id;
+          loadWalrusCompare(walrusVideo, video.walrus_blob_id);
+        } else {
+          document.getElementById('walrus-status').textContent = 'Not on Walrus';
+          document.getElementById('walrus-status').className = 'stat-value neutral';
+          document.getElementById('walrus-blob-id').textContent = 'Not uploaded';
+        }
 
       } catch (err) {
         document.getElementById('orca-status').textContent = 'Error';
@@ -1348,62 +1406,56 @@ hls.<span class="function">loadSource</span>(manifest);
       }
     }
 
-    function simulateWalrusDemo(videoEl, id) {
-      // Simulate Walrus blob ID
-      const simulatedBlobId = '0x' + Array.from({length: 64}, () => 
-        Math.floor(Math.random() * 16).toString(16)
-      ).join('').slice(0, 16) + '...';
-      
-      document.getElementById('walrus-blob-id').textContent = simulatedBlobId;
+    async function loadWalrusCompare(videoEl, blobId) {
+      const startTime = performance.now();
+      let downloadDone = false;
+      let firstFrameDone = false;
 
-      // For demo purposes, use the same Orca manifest but simulate higher latency
-      // In a real implementation, this would fetch from Walrus Aggregator
-      const simulatedManifest = window.location.origin + '/stream/' + encodeURIComponent(id) + '/index.m3u8';
-      
-      // Simulate initial loading delay (like fetching from decentralized storage)
-      setTimeout(() => {
-        if (Hls.isSupported()) {
-          compareWalrusHls = new Hls({
-            enableWorker: true,
-            lowLatencyMode: false // Walrus typically has higher latency
-          });
+      document.getElementById('walrus-status').textContent = 'Downloading...';
+      document.getElementById('walrus-status').className = 'stat-value neutral';
 
-          compareWalrusHls.loadSource(simulatedManifest);
-          compareWalrusHls.attachMedia(videoEl);
+      try {
+        const res = await fetch('/api/walrus/' + encodeURIComponent(blobId));
 
-          compareWalrusHls.on(Hls.Events.MANIFEST_PARSED, () => {
-            document.getElementById('walrus-status').textContent = 'Playing';
-            document.getElementById('walrus-status').className = 'stat-value';
-          });
-
-          videoEl.addEventListener('playing', () => {
-            if (!walrusSimulatedLatency) {
-              // Simulate 2-5s initial latency for decentralized storage
-              walrusSimulatedLatency = 2000 + Math.random() * 3000;
-              document.getElementById('walrus-first-frame').textContent = 
-                walrusSimulatedLatency.toFixed(0) + 'ms (sim)';
-            }
-          }, { once: true });
-
-          videoEl.play().catch(() => {});
-
-          // Track buffer health for Walrus (typically less buffered due to latency)
-          setInterval(() => {
-            if (compareWalrusHls && videoEl.buffered.length > 0) {
-              const bufferedEnd = videoEl.buffered.end(videoEl.buffered.length - 1);
-              const bufferAhead = bufferedEnd - videoEl.currentTime;
-              const bufferEl = document.getElementById('walrus-buffer');
-              if (bufferEl) {
-                bufferEl.textContent = bufferAhead.toFixed(1) + 's';
-              }
-            }
-          }, 1000);
-
-        } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-          videoEl.src = simulatedManifest;
-          videoEl.play().catch(() => {});
+        if (!res.ok) {
+          document.getElementById('walrus-status').textContent = 'Fetch failed';
+          document.getElementById('walrus-status').className = 'stat-value slow';
+          return;
         }
-      }, 1500 + Math.random() * 1000); // Simulate 1.5-2.5s network delay
+
+        const blob = await res.blob();
+
+        if (!downloadDone) {
+          downloadDone = true;
+          const dlLatency = performance.now() - startTime;
+          document.getElementById('walrus-dl-latency').textContent = dlLatency.toFixed(0) + 'ms';
+          document.getElementById('walrus-dl-latency').className =
+            dlLatency < 2000 ? 'stat-value fast' : 'stat-value';
+        }
+
+        const objectUrl = URL.createObjectURL(blob);
+        videoEl.src = objectUrl;
+
+        videoEl.addEventListener('loadedmetadata', () => {
+          document.getElementById('walrus-status').textContent = 'Ready';
+          document.getElementById('walrus-status').className = 'stat-value';
+          videoEl.play().catch(() => {});
+        });
+
+        videoEl.addEventListener('playing', () => {
+          if (!firstFrameDone) {
+            firstFrameDone = true;
+            const latency = performance.now() - startTime;
+            document.getElementById('walrus-first-frame').textContent = latency.toFixed(0) + 'ms';
+            document.getElementById('walrus-first-frame').className =
+              latency < 5000 ? 'stat-value fast' : 'stat-value';
+          }
+        }, { once: true });
+
+      } catch (err) {
+        document.getElementById('walrus-status').textContent = 'Error';
+        document.getElementById('walrus-status').className = 'stat-value slow';
+      }
     }
 
     function simulateSeek(type) {

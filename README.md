@@ -295,7 +295,7 @@ vlc http://localhost:8080/stream/abc123/index.m3u8
 - 左右對比：首播延遲、seek 延遲、開發者體驗
 - ⚠️ Walrus 端目前為 mock，尚未串接真實 Aggregator
 
-### Milestone 4（新）：真實 Walrus 串接
+### Milestone 4（已完成）：真實 Walrus 串接
 
 將 compare view 的 Walrus 面板改為實際串接 Walrus Aggregator，達成真正的效能對比實驗。
 
@@ -304,17 +304,19 @@ vlc http://localhost:8080/stream/abc123/index.m3u8
 1. **影片雙軌上傳**
    - 上傳時同時發給 Orca 和 Walrus Publisher API
    - 紀錄 Walrus blob ID
-2. **併發上傳最佳化（工程隱患處理）**
-   - 實作 Worker Pool 處理小檔案上傳，避免因網路往返（RTT）導致上傳效率低下
-3. **Compare View 實驗模式**
-   - Walrus 面板改用 `Aggregators/{blobId}/...` 直接串流
-   - 測量首播延遲、seek 延遲、buffer health 等指標
+2. **Compare View 實驗模式**
+   - Walrus 面板改用 `/api/walrus/{blobId}` 直接串流原始 MP4
+   - 測量下載延遲、首播延遲、seek 延遲等指標
 
 **驗證方式：**
 
 ```bash
+# 啟動後自動使用 Walrus 測試網上傳
+make run
+
 # 上傳影片，取得 Walrus blob ID
-# 打開 compare view，測量 Orca vs Walrus 的首播延遲差異
+curl -X POST http://localhost:8080/api/upload -F "video=@test.mp4" -H "X-API-Key: xxx"
+# 打開 compare view，測量 Orca vs Walrus 的延遲差異
 ```
 
 ### Milestone 5（+2 週）：Walrus Storage Backend

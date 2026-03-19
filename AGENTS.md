@@ -192,6 +192,8 @@ func TestValidateMagicBytes(t *testing.T) {
 | `ORCA_FFMPEG_PATH` | `ffmpeg` | Path to ffmpeg binary |
 | `ORCA_FFPROBE_PATH` | `ffprobe` | Path to ffprobe binary |
 | `ORCA_MAX_FILE_SIZE_MB` | `500` | Upload size limit in MB |
+| `ORCA_WALRUS_PUBLISHER_URL` | `https://publisher.walrus-testnet.walrus.space` | Walrus Publisher API URL |
+| `ORCA_WALRUS_AGGREGATOR_URL` | `https://aggregator.walrus-testnet.walrus.space` | Walrus Aggregator API URL |
 
 ## Directory Structure
 

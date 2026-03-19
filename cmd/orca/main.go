@@ -42,6 +42,7 @@ func main() {
 
 	// Video list
 	mux.Handle("GET /api/videos", apiAuth(handler.NewVideos(videos)))
+	mux.Handle("GET /api/walrus/{blobId}", handler.NewWalrusBlob(cfg))
 
 	// Stream routes (with CORS)
 	cors := middleware.CORS()
@@ -68,7 +69,12 @@ func main() {
 	defer stop()
 
 	go func() {
-		slog.Info("orca server starting", "port", cfg.Port, "storage", cfg.StorageDir)
+		slog.Info("orca server starting",
+			"port", cfg.Port,
+			"storage", cfg.StorageDir,
+			"walrus_publisher", cfg.WalrusPublisher,
+			"walrus_aggregator", cfg.WalrusAggregator,
+		)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("server error", "error", err)
 			os.Exit(1)
