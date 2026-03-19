@@ -68,6 +68,10 @@ func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := generateID()
+	title := r.FormValue("title")
+	if title == "" {
+		title = id
+	}
 
 	filePath, err := h.store.SaveUpload(id, bytes.NewReader(data))
 	if err != nil {
@@ -78,7 +82,7 @@ func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.videos.Create(id)
+	h.videos.Create(id, title)
 
 	go h.processVideo(id, filePath)
 

@@ -37,8 +37,8 @@ func TestVideos_EmptyList(t *testing.T) {
 
 func TestVideos_ReturnsList(t *testing.T) {
 	videos := model.NewVideoStore()
-	videos.Create("vid-001")
-	videos.Create("vid-002")
+	videos.Create("vid-001", "Title 1")
+	videos.Create("vid-002", "Title 2")
 	videos.SetReady("vid-001", 120.5)
 
 	h := NewVideos(videos)
@@ -78,8 +78,8 @@ func TestVideos_SortedNewestFirst(t *testing.T) {
 	videos := model.NewVideoStore()
 	older := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	newer := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
-	videos.CreateAt("older", older)
-	videos.CreateAt("newer", newer)
+	videos.CreateAt("older", "Older", older)
+	videos.CreateAt("newer", "Newer", newer)
 
 	h := NewVideos(videos)
 

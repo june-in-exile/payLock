@@ -15,6 +15,7 @@ const (
 
 type Video struct {
 	ID           string  `json:"id"`
+	Title        string  `json:"title"`
 	Status       Status  `json:"status"`
 	CreatedAt    string  `json:"created_at"`
 	Duration     float64 `json:"duration,omitempty"`
@@ -33,13 +34,14 @@ func NewVideoStore() *VideoStore {
 	}
 }
 
-func (s *VideoStore) Create(id string) *Video {
-	return s.CreateAt(id, time.Now().UTC())
+func (s *VideoStore) Create(id, title string) *Video {
+	return s.CreateAt(id, title, time.Now().UTC())
 }
 
-func (s *VideoStore) CreateAt(id string, t time.Time) *Video {
+func (s *VideoStore) CreateAt(id, title string, t time.Time) *Video {
 	v := &Video{
 		ID:        id,
+		Title:     title,
 		Status:    StatusProcessing,
 		CreatedAt: t.Format(time.RFC3339),
 	}
@@ -49,9 +51,10 @@ func (s *VideoStore) CreateAt(id string, t time.Time) *Video {
 	return v
 }
 
-func (s *VideoStore) Restore(id string, status Status, t time.Time) *Video {
+func (s *VideoStore) Restore(id, title string, status Status, t time.Time) *Video {
 	v := &Video{
 		ID:        id,
+		Title:     title,
 		Status:    status,
 		CreatedAt: t.Format(time.RFC3339),
 	}

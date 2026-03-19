@@ -7,7 +7,7 @@ import (
 func TestVideoStore_CreateAndGet(t *testing.T) {
 	store := NewVideoStore()
 
-	store.Create("test-1")
+	store.Create("test-1", "My Video")
 
 	v, ok := store.Get("test-1")
 	if !ok {
@@ -15,6 +15,9 @@ func TestVideoStore_CreateAndGet(t *testing.T) {
 	}
 	if v.ID != "test-1" {
 		t.Errorf("expected id test-1, got %s", v.ID)
+	}
+	if v.Title != "My Video" {
+		t.Errorf("expected title My Video, got %s", v.Title)
 	}
 	if v.Status != StatusProcessing {
 		t.Errorf("expected status processing, got %s", v.Status)
@@ -32,7 +35,7 @@ func TestVideoStore_GetNotFound(t *testing.T) {
 
 func TestVideoStore_SetReady(t *testing.T) {
 	store := NewVideoStore()
-	store.Create("test-1")
+	store.Create("test-1", "My Video")
 
 	store.SetReady("test-1", 120.5)
 
@@ -47,7 +50,7 @@ func TestVideoStore_SetReady(t *testing.T) {
 
 func TestVideoStore_SetFailed(t *testing.T) {
 	store := NewVideoStore()
-	store.Create("test-1")
+	store.Create("test-1", "My Video")
 
 	store.SetFailed("test-1", "something went wrong")
 
@@ -62,7 +65,7 @@ func TestVideoStore_SetFailed(t *testing.T) {
 
 func TestVideoStore_GetReturnsImmutableCopy(t *testing.T) {
 	store := NewVideoStore()
-	store.Create("test-1")
+	store.Create("test-1", "My Video")
 
 	v1, _ := store.Get("test-1")
 	v1.Status = StatusReady // mutate the copy
@@ -75,8 +78,8 @@ func TestVideoStore_GetReturnsImmutableCopy(t *testing.T) {
 
 func TestVideoStore_List(t *testing.T) {
 	store := NewVideoStore()
-	store.Create("a")
-	store.Create("b")
+	store.Create("a", "Title A")
+	store.Create("b", "Title B")
 
 	list := store.List()
 	if len(list) != 2 {

@@ -90,21 +90,22 @@
     .fab {
       width: 48px;
       height: 48px;
-      background: var(--accent);
-      color: white;
+      background: #222222;
+      color: #ffffff;
+      border: 1px solid #333333;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 1.5rem;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      transition: transform 0.2s, background 0.2s;
-      border: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      transition: transform 0.2s, background 0.2s, border-color 0.2s;
     }
 
     .fab:hover {
-      background: var(--accent-hover);
+      background: #333333;
+      border-color: #555555;
       transform: scale(1.05);
     }
 
@@ -250,7 +251,9 @@
       font-size: 0.8rem;
       color: var(--text-muted);
       display: flex;
-      gap: 0.75rem;
+      flex-wrap: wrap;
+      gap: 0.5rem 0.75rem;
+      align-items: center;
     }
 
     .status-badge {
@@ -277,41 +280,50 @@
 
     .btn {
       display: inline-block;
-      padding: 0.5rem 1.25rem;
-      background: var(--accent);
-      color: #fff;
-      border: none;
+      padding: 0.4rem 1rem;
+      background: #222222;
+      color: #e4e4e7;
+      border: 1px solid #333333;
       border-radius: 6px;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       cursor: pointer;
       text-decoration: none;
-      transition: background 0.2s;
+      transition: all 0.2s;
     }
 
-    .btn:hover { background: var(--accent-hover); }
+    .btn:hover { 
+      background: #333333; 
+      border-color: #555555; 
+      color: #ffffff;
+    }
 
     .btn-sm {
       padding: 0.25rem 0.6rem;
-      font-size: 0.75rem;
+      font-size: 0.8rem;
     }
 
     .btn-outline {
       background: transparent;
-      border: 1px solid var(--accent);
-      color: var(--accent);
+      border: 1px solid #333333;
+      color: #71717a;
     }
 
-    .btn-outline:hover { background: rgba(59, 130, 246, 0.1); }
+    .btn-outline:hover { 
+      border-color: #666666;
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.05); 
+    }
 
     .btn-danger {
       background: transparent;
-      border: 1px solid rgba(239, 68, 68, 0.4);
-      color: var(--error);
+      border: 1px solid #333333;
+      color: #71717a;
     }
 
     .btn-danger:hover {
-      background: rgba(239, 68, 68, 0.15);
-      border-color: var(--error);
+      background: rgba(255, 255, 255, 0.05);
+      border-color: #666666;
+      color: #ffffff;
     }
 
     .video-actions {
@@ -365,22 +377,7 @@
       border: 1px solid var(--border);
     }
 
-    .btn-sm {
-      padding: 0.35rem 0.75rem;
-      font-size: 0.8rem;
-    }
 
-    .btn-outline {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text-muted);
-    }
-
-    .btn-outline:hover {
-      border-color: var(--text);
-      color: var(--text);
-      background: transparent;
-    }
 
     .back-link {
       display: inline-block;
@@ -518,17 +515,18 @@
     .btn-compare {
       padding: 0.4rem 0.75rem;
       font-size: 0.8rem;
-      background: rgba(59, 130, 246, 0.1);
-      border: 1px solid rgba(59, 130, 246, 0.3);
-      color: var(--accent);
+      background: transparent;
+      border: 1px solid #333333;
+      color: #71717a;
       border-radius: 6px;
       cursor: pointer;
       transition: all 0.2s;
     }
 
     .btn-compare:hover {
-      background: rgba(59, 130, 246, 0.2);
-      border-color: var(--accent);
+      background: rgba(255, 255, 255, 0.05);
+      border-color: #666666;
+      color: #ffffff;
     }
 
     /* Wallet */
@@ -549,27 +547,28 @@
     }
 
     .wallet-btn.connect {
-      background: rgba(168, 85, 247, 0.15);
-      border-color: rgba(168, 85, 247, 0.4);
-      color: #a855f7;
+      background: #222222;
+      border-color: #333333;
+      color: #e4e4e7;
     }
 
     .wallet-btn.connect:hover {
-      background: rgba(168, 85, 247, 0.25);
-      border-color: #a855f7;
+      background: #333333;
+      border-color: #555555;
+      color: #ffffff;
     }
 
     .wallet-btn.connected {
-      background: rgba(34, 197, 94, 0.1);
-      border-color: rgba(34, 197, 94, 0.3);
-      color: var(--success);
+      background: transparent;
+      border-color: #333333;
+      color: #888888;
       position: relative;
     }
 
     .wallet-btn.connected:hover {
-      background: rgba(239, 68, 68, 0.1);
-      border-color: rgba(239, 68, 68, 0.3);
-      color: var(--error);
+      background: rgba(255, 255, 255, 0.05);
+      border-color: #555555;
+      color: #ffffff;
     }
 
     .wallet-info {
@@ -639,17 +638,18 @@
     .btn-walrus {
       padding: 0.4rem 1rem;
       font-size: 0.85rem;
-      background: rgba(168, 85, 247, 0.15);
-      border: 1px solid rgba(168, 85, 247, 0.4);
-      color: #a855f7;
+      background: #222222;
+      border: 1px solid #333333;
+      color: #e4e4e7;
       border-radius: 6px;
       cursor: pointer;
       transition: all 0.2s;
     }
 
     .btn-walrus:hover {
-      background: rgba(168, 85, 247, 0.25);
-      border-color: #a855f7;
+      background: #333333;
+      border-color: #555555;
+      color: #ffffff;
     }
 
     .btn-walrus:disabled {
@@ -713,12 +713,17 @@
       </div>
       <div class="upload-result" id="upload-result"></div>
 
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
-        <h2 style="margin-bottom:0;">Videos</h2>
-        <div style="display:flex; gap:0.75rem; align-items:center;">
-          <button class="refresh-btn" onclick="loadVideos()">Refresh</button>
-          <button class="fab" onclick="document.getElementById('upload-file').click()" title="Upload Video">+</button>
-          <input type="file" id="upload-file" accept="video/mp4,.mp4" style="display:none;">
+      <div style="margin-bottom: 1.5rem; padding: 1.25rem; background: var(--surface); border-radius: 8px;">
+        <label for="video-title" style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Video Title (optional)</label>
+        <input type="text" id="video-title" placeholder="Enter video title" style="width: 100%; padding: 0.6rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem; margin-bottom: 1rem;">
+        
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <h2 style="margin-bottom:0;">Videos</h2>
+          <div style="display:flex; gap:0.75rem; align-items:center;">
+            <button class="refresh-btn" onclick="loadVideos()">Refresh</button>
+            <button class="btn" onclick="document.getElementById('upload-file').click()" title="Upload Video">Upload MP4</button>
+            <input type="file" id="upload-file" accept="video/mp4,.mp4" style="display:none;">
+          </div>
         </div>
       </div>
       <div id="video-list"></div>
@@ -728,7 +733,10 @@
     <div id="view-player" class="view">
       <a class="back-link" onclick="navigate('videos')">&larr; Back to videos</a>
       <div class="player-info">
-        <span class="video-id" id="player-video-id"></span>
+        <div style="display:flex; flex-direction:column;">
+          <span class="video-title" id="player-video-title" style="font-size:1.25rem; font-weight:600; margin-bottom:0.25rem;"></span>
+          <span class="video-id" id="player-video-id" style="font-size:0.8rem; color:var(--text-muted); font-family:monospace;"></span>
+        </div>
         <span class="status-badge" id="player-status"></span>
       </div>
       <div class="player-container">
@@ -846,6 +854,12 @@
     let connectedWallet = null;
     let connectedAccount = null;
     let suiClient = null;
+    let discoveredWallets = [];
+    let unsubscribeWalletEvents = null;
+
+    function findSlushWallet() {
+      return discoveredWallets.find(w => w.name.toLowerCase().includes('slush'));
+    }
 
     async function initWallet() {
       try {
@@ -859,17 +873,42 @@
         const { getWallets } = walletMod;
         const { SuiClient, getFullnodeUrl } = suiMod;
 
+        suiClient = new SuiClient({ url: getFullnodeUrl('testnet') });
+        window._walletStandard = { getWallets, SuiClient, getFullnodeUrl, suiClient };
+
+        // Collect wallets already registered + listen for future registrations
+        const { get, on } = getWallets();
+        discoveredWallets = [...get()];
+
+        const unsubRegister = on('register', (...newWallets) => {
+          for (const w of newWallets) {
+            if (!discoveredWallets.some(existing => existing.name === w.name)) {
+              discoveredWallets.push(w);
+            }
+          }
+          // Auto-reconnect when saved session exists and slush just appeared
+          const savedAddr = sessionStorage.getItem('orca_wallet_addr');
+          if (savedAddr && !connectedWallet && findSlushWallet()) {
+            autoReconnect();
+          }
+        });
+
+        const unsubUnregister = on('unregister', (...removed) => {
+          for (const w of removed) {
+            discoveredWallets = discoveredWallets.filter(existing => existing.name !== w.name);
+          }
+        });
+
+        unsubscribeWalletEvents = () => { unsubRegister(); unsubUnregister(); };
+
+        // Register Slush wallet adapter (creates iframe, registers asynchronously)
         registerSlushWallet('Orca Video Streaming', {
           origin: 'https://slush.app',
         });
 
-        suiClient = new SuiClient({ url: getFullnodeUrl('testnet') });
-
-        window._walletStandard = { getWallets, SuiClient, getFullnodeUrl, suiClient };
-
-        // Check for previously connected wallet in session
+        // If wallet is already available (e.g. browser extension), try reconnect now
         const savedAddr = sessionStorage.getItem('orca_wallet_addr');
-        if (savedAddr) {
+        if (savedAddr && findSlushWallet()) {
           await autoReconnect();
         }
       } catch (err) {
@@ -883,18 +922,14 @@
 
     async function autoReconnect() {
       try {
-        const { getWallets } = window._walletStandard;
-        const { get } = getWallets();
-        const wallets = get();
-        const slush = wallets.find(w => w.name.toLowerCase().includes('slush'));
-        if (slush) {
-          const connectFeature = slush.features['standard:connect'];
-          const result = await connectFeature.connect({ silent: true });
-          if (result.accounts && result.accounts.length > 0) {
-            connectedWallet = slush;
-            connectedAccount = result.accounts[0];
-            await updateWalletUI();
-          }
+        const slush = findSlushWallet();
+        if (!slush) return;
+        const connectFeature = slush.features['standard:connect'];
+        const result = await connectFeature.connect({ silent: true });
+        if (result.accounts && result.accounts.length > 0) {
+          connectedWallet = slush;
+          connectedAccount = result.accounts[0];
+          await updateWalletUI();
         }
       } catch (_) {
         sessionStorage.removeItem('orca_wallet_addr');
@@ -908,11 +943,7 @@
       }
 
       try {
-        const { getWallets } = window._walletStandard;
-        const { get } = getWallets();
-        const wallets = get();
-
-        const slush = wallets.find(w => w.name.toLowerCase().includes('slush'));
+        const slush = findSlushWallet();
         if (!slush) {
           window.open('https://slush.app', '_blank');
           return;
@@ -1220,15 +1251,20 @@
       const info = document.createElement('div');
       info.className = 'video-info';
 
-      const idEl = document.createElement('div');
-      idEl.className = 'video-id';
-      idEl.textContent = v.id;
-      idEl.style.cursor = 'pointer';
-      idEl.addEventListener('click', () => navigate('player', { id: v.id }));
-      info.appendChild(idEl);
+      const titleEl = document.createElement('div');
+      titleEl.className = 'video-id';
+      titleEl.textContent = v.title || v.id;
+      titleEl.style.cursor = 'pointer';
+      titleEl.addEventListener('click', () => navigate('player', { id: v.id }));
+      info.appendChild(titleEl);
 
       const meta = document.createElement('div');
       meta.className = 'video-meta';
+
+      const idEl = document.createElement('span');
+      idEl.textContent = 'ID: ' + v.id.slice(0, 8);
+      idEl.style.fontFamily = 'monospace';
+      meta.appendChild(idEl);
 
       const statusBadge = document.createElement('span');
       const safeStatus = ['ready', 'processing', 'failed'].includes(v.status) ? v.status : 'failed';
@@ -1408,6 +1444,10 @@
 
       const formData = new FormData();
       formData.append('video', file);
+      const title = document.getElementById('video-title').value;
+      if (title) {
+        formData.append('title', title);
+      }
 
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/api/upload');
@@ -1430,6 +1470,7 @@
         if (xhr.status === 202) {
           const data = JSON.parse(xhr.responseText);
           uploadFile.value = '';
+          document.getElementById('video-title').value = '';
           navigate('player', { id: data.id });
         } else {
           let msg = 'Upload failed.';
@@ -1475,6 +1516,7 @@
       const videoEl = document.getElementById('video-player');
       const statusEl = document.getElementById('player-status');
       const urlEl = document.getElementById('stream-url');
+      const titleEl = document.getElementById('player-video-title');
 
       // Abort if user navigated away
       if (generation !== navGeneration) return;
@@ -1492,6 +1534,7 @@
           return;
         }
         const video = await res.json();
+        titleEl.textContent = video.title || video.id;
         const safeStatus = ['ready', 'processing', 'failed'].includes(video.status) ? video.status : 'failed';
         statusEl.textContent = video.status;
         statusEl.className = 'status-badge ' + safeStatus;
@@ -1519,6 +1562,7 @@
             }
             if (r.ok) {
               const v = await r.json();
+              titleEl.textContent = v.title || v.id;
               const ss = ['ready', 'processing', 'failed'].includes(v.status) ? v.status : 'failed';
               statusEl.textContent = v.status;
               statusEl.className = 'status-badge ' + ss;

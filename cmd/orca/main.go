@@ -38,10 +38,10 @@ func scanStorage(store *storage.LocalStorage, videos *model.VideoStore) {
 			t = time.Now().UTC()
 		}
 		if store.HasManifest(id) {
-			videos.Restore(id, model.StatusReady, t)
+			videos.Restore(id, id, model.StatusReady, t)
 			slog.Info("restored video", "id", id, "status", "ready")
 		} else if store.HasUpload(id) {
-			videos.Restore(id, model.StatusFailed, t)
+			videos.Restore(id, id, model.StatusFailed, t)
 			slog.Info("restored video", "id", id, "status", "failed")
 		}
 	}
