@@ -165,10 +165,14 @@
       margin-bottom: 0.5rem;
     }
 
+    .api-key-wrapper {
+      position: relative;
+      max-width: 400px;
+    }
+
     .api-key-section input {
       width: 100%;
-      max-width: 400px;
-      padding: 0.5rem 0.75rem;
+      padding: 0.5rem 2.5rem 0.5rem 0.75rem;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 6px;
@@ -180,6 +184,26 @@
     .api-key-section input:focus {
       outline: none;
       border-color: var(--accent);
+    }
+
+    .api-key-toggle {
+      position: absolute;
+      right: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s;
+    }
+
+    .api-key-toggle:hover {
+      color: var(--text);
     }
 
     /* Video list */
@@ -380,7 +404,15 @@
       <h2>Upload Video</h2>
       <div class="api-key-section">
         <label for="api-key">API Key</label>
-        <input type="password" id="api-key" placeholder="Enter your API key">
+        <div class="api-key-wrapper">
+          <input type="password" id="api-key" placeholder="Enter your API key">
+          <button type="button" class="api-key-toggle" id="api-key-toggle" title="Toggle visibility">
+            <svg id="eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </button>
+        </div>
       </div>
       <div class="upload-area" id="upload-area">
         <div style="font-size:2rem; margin-bottom:0.5rem;">&#x1F4C1;</div>
@@ -393,6 +425,17 @@
         <div class="progress-text" id="progress-text">Uploading...</div>
       </div>
       <div class="upload-result" id="upload-result"></div>
+      <div class="upload-success-screen" id="upload-success">
+        <div class="success-icon">
+          <svg viewBox="0 0 24 24"><path class="check-path" d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <h3>Upload Complete</h3>
+        <p class="success-detail">Your video is now being processed.</p>
+        <div class="success-id" id="success-video-id"></div>
+        <br>
+        <button class="btn" id="success-watch-btn">Watch Video</button>
+        <p class="auto-redirect" id="auto-redirect-text"></p>
+      </div>
     </div>
 
     <!-- Player view -->
@@ -440,6 +483,7 @@
         loadVideos();
         window.location.hash = 'videos';
       } else if (view === 'upload') {
+        resetUploadView();
         window.location.hash = 'upload';
       } else if (view === 'player' && params && params.id) {
         window.location.hash = 'play/' + params.id;
@@ -454,11 +498,32 @@
       });
     });
 
-    // API Key persistence
+    // API Key persistence & toggle
     const apiKeyInput = document.getElementById('api-key');
+    const apiKeyToggle = document.getElementById('api-key-toggle');
+    const eyeIcon = document.getElementById('eye-icon');
+
     apiKeyInput.value = localStorage.getItem('orca_api_key') || '';
     apiKeyInput.addEventListener('input', () => {
       localStorage.setItem('orca_api_key', apiKeyInput.value);
+    });
+
+    apiKeyToggle.addEventListener('click', () => {
+      const isPassword = apiKeyInput.type === 'password';
+      apiKeyInput.type = isPassword ? 'text' : 'password';
+      
+      // Update eye icon
+      if (isPassword) {
+        eyeIcon.innerHTML = `
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+          <line x1="1" y1="1" x2="23" y2="23"></line>
+        `;
+      } else {
+        eyeIcon.innerHTML = `
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        `;
+      }
     });
 
     function getApiKey() {
@@ -623,7 +688,7 @@
         if (xhr.status === 202) {
           const data = JSON.parse(xhr.responseText);
           uploadFile.value = '';
-          navigate('player', { id: data.id });
+          showUploadSuccess(data.id);
         } else {
           let msg = 'Upload failed.';
           try { msg = JSON.parse(xhr.responseText).error || msg; } catch(e) {}
@@ -642,6 +707,56 @@
     function showResult(type, message) {
       uploadResult.className = 'upload-result ' + type;
       uploadResult.textContent = message;
+    }
+
+    let uploadSuccessTimer = null;
+
+    function showUploadSuccess(videoId) {
+      uploadArea.style.display = 'none';
+      document.querySelector('.api-key-section').style.display = 'none';
+      uploadResult.style.display = 'none';
+      uploadProgress.classList.remove('active');
+
+      const successScreen = document.getElementById('upload-success');
+      document.getElementById('success-video-id').textContent = videoId;
+      successScreen.classList.remove('active');
+      // Force reflow so animation replays
+      void successScreen.offsetWidth;
+      successScreen.classList.add('active');
+
+      const redirectText = document.getElementById('auto-redirect-text');
+      let countdown = 5;
+      redirectText.textContent = 'Redirecting to player in ' + countdown + 's...';
+
+      const goToPlayer = () => {
+        clearInterval(uploadSuccessTimer);
+        uploadSuccessTimer = null;
+        resetUploadView();
+        navigate('player', { id: videoId });
+      };
+
+      document.getElementById('success-watch-btn').onclick = goToPlayer;
+
+      uploadSuccessTimer = setInterval(() => {
+        countdown--;
+        if (countdown <= 0) {
+          goToPlayer();
+        } else {
+          redirectText.textContent = 'Redirecting to player in ' + countdown + 's...';
+        }
+      }, 1000);
+    }
+
+    function resetUploadView() {
+      uploadArea.style.display = '';
+      document.querySelector('.api-key-section').style.display = '';
+      uploadResult.className = 'upload-result';
+      uploadResult.style.display = 'none';
+      document.getElementById('upload-success').classList.remove('active');
+      if (uploadSuccessTimer) {
+        clearInterval(uploadSuccessTimer);
+        uploadSuccessTimer = null;
+      }
     }
 
     // Player
