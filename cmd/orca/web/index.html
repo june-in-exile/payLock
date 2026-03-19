@@ -622,8 +622,8 @@
         uploadProgress.classList.remove('active');
         if (xhr.status === 202) {
           const data = JSON.parse(xhr.responseText);
-          showUploadSuccess(data.id);
           uploadFile.value = '';
+          navigate('player', { id: data.id });
         } else {
           let msg = 'Upload failed.';
           try { msg = JSON.parse(xhr.responseText).error || msg; } catch(e) {}
@@ -642,31 +642,6 @@
     function showResult(type, message) {
       uploadResult.className = 'upload-result ' + type;
       uploadResult.textContent = message;
-    }
-
-    function showUploadSuccess(videoId) {
-      uploadResult.className = 'upload-result success';
-      uploadResult.textContent = '';
-
-      const text = document.createTextNode('Video uploaded! ID: ');
-      uploadResult.appendChild(text);
-
-      const strong = document.createElement('strong');
-      strong.textContent = videoId;
-      uploadResult.appendChild(strong);
-
-      uploadResult.appendChild(document.createTextNode(' \u2014 '));
-
-      const watchLink = document.createElement('a');
-      watchLink.href = '#play/' + encodeURIComponent(videoId);
-      watchLink.textContent = 'Watch';
-      watchLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        navigate('player', { id: videoId });
-      });
-      uploadResult.appendChild(watchLink);
-
-      uploadResult.appendChild(document.createTextNode(' | Status: processing...'));
     }
 
     // Player

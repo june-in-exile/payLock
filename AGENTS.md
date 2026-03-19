@@ -53,6 +53,7 @@ go test ./internal/processor/... -run TestValidateMagicBytes -v
 ### Imports
 
 Group imports in this order:
+
 1. Standard library (no prefix)
 2. Third-party packages (empty line before)
 3. Internal packages with full import path (empty line before)

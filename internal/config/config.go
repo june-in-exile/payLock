@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -17,6 +19,9 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
+	// Load .env if present; ignore if missing
+	_ = godotenv.Load()
+
 	cfg := &Config{
 		Port:        envOrDefault("ORCA_PORT", "8080"),
 		StorageDir:  envOrDefault("ORCA_STORAGE_DIR", "./storage"),
