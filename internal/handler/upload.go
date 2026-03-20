@@ -14,23 +14,17 @@ import (
 	"github.com/anthropics/orca/internal/model"
 	"github.com/anthropics/orca/internal/processor"
 	"github.com/anthropics/orca/internal/storage"
-	"github.com/anthropics/orca/internal/walrus"
 )
 
 type Upload struct {
-	store  storage.Backend
+	store  *storage.LocalStorage
 	proc   *processor.Processor
 	videos *model.VideoStore
 	cfg    *config.Config
-	walrus *walrus.Client
 }
 
-func NewUpload(store storage.Backend, proc *processor.Processor, videos *model.VideoStore, cfg *config.Config) *Upload {
-	var wc *walrus.Client
-	if cfg.WalrusPublisher != "" && cfg.WalrusAggregator != "" {
-		wc = walrus.NewClient(cfg.WalrusPublisher, cfg.WalrusAggregator)
-	}
-	return &Upload{store: store, proc: proc, videos: videos, cfg: cfg, walrus: wc}
+func NewUpload(store *storage.LocalStorage, proc *processor.Processor, videos *model.VideoStore, cfg *config.Config) *Upload {
+	return &Upload{store: store, proc: proc, videos: videos, cfg: cfg}
 }
 
 func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -90,12 +84,6 @@ func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	go h.processVideo(id, filePath)
 
-	// Skip backend Walrus upload when frontend handles it via wallet
-	clientHandlesWalrus := r.Header.Get("X-Walrus-Client") == "true"
-	if h.walrus != nil && !clientHandlesWalrus {
-		go h.uploadToWalrus(id, data)
-	}
-
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"id":     id,
 		"status": model.StatusProcessing,
@@ -119,30 +107,8 @@ func (h *Upload) processVideo(id, filePath string) {
 		return
 	}
 
-	// If the backend supports finalization (e.g., Walrus), upload segments now
-	type finalizer interface {
-		Finalize(id, gatewayURL string) error
-	}
-	if f, ok := h.store.(finalizer); ok {
-		if err := f.Finalize(id, h.cfg.GatewayURL); err != nil {
-			slog.Error("storage finalize failed", "id", id, "error", err)
-			h.videos.SetFailed(id, "storage finalize failed: "+err.Error())
-			return
-		}
-	}
-
 	h.videos.SetReady(id, duration)
 	slog.Info("video ready", "id", id, "duration", duration)
-}
-
-func (h *Upload) uploadToWalrus(id string, data []byte) {
-	blobID, err := h.walrus.Store(data)
-	if err != nil {
-		slog.Error("walrus upload failed", "id", id, "error", err)
-		return
-	}
-	h.videos.SetWalrusBlobID(id, blobID)
-	slog.Info("walrus upload succeeded", "id", id, "blob_id", blobID)
 }
 
 func generateID() string {

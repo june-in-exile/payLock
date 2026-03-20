@@ -8,21 +8,7 @@ import (
 	"path/filepath"
 )
 
-// Backend is the seam for swapping local disk → Walrus or other storage.
-type Backend interface {
-	SaveUpload(id string, r io.Reader) (string, error)
-	SegmentPath(id, file string) (string, error)
-	ManifestPath(id string) (string, error)
-	OutputDir(id string) string
-	SaveMetadata(id string, meta Metadata) error
-	LoadMetadata(id string) (Metadata, error)
-	Delete(id string) error
-	List() ([]string, error)
-	HasManifest(id string) bool
-	HasUpload(id string) bool
-}
-
-// LocalStorage implements Backend using the local filesystem.
+// LocalStorage implements video storage using the local filesystem.
 type LocalStorage struct {
 	root string
 }

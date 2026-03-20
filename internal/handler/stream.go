@@ -12,11 +12,11 @@ import (
 var validFilename = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`)
 
 type Stream struct {
-	store  storage.Backend
+	store  *storage.LocalStorage
 	videos *model.VideoStore
 }
 
-func NewStream(store storage.Backend, videos *model.VideoStore) *Stream {
+func NewStream(store *storage.LocalStorage, videos *model.VideoStore) *Stream {
 	return &Stream{store: store, videos: videos}
 }
 

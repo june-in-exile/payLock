@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"embed"
-	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -23,7 +22,7 @@ import (
 //go:embed web
 var webFS embed.FS
 
-func scanStorage(store storage.Backend, videos *model.VideoStore) {
+func scanStorage(store *storage.LocalStorage, videos *model.VideoStore) {
 	ids, err := store.List()
 	if err != nil {
 		slog.Warn("failed to scan storage directory", "error", err)
@@ -64,14 +63,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	store, err := storage.New(cfg)
-	if err != nil {
-		slog.Error("failed to create storage backend", "error", err)
-		os.Exit(1)
-	}
-	if closer, ok := store.(io.Closer); ok {
-		defer closer.Close()
-	}
+	store := storage.NewLocal(cfg.StorageDir)
 
 	proc := processor.New(cfg.FFmpegPath, cfg.FFprobePath)
 	videos := model.NewVideoStore()
@@ -85,8 +77,6 @@ func main() {
 	mux.Handle("GET /api/status/{id}", handler.NewStatus(videos))
 	mux.Handle("GET /api/videos", handler.NewVideos(videos))
 	mux.Handle("DELETE /api/videos/{id}", handler.NewDelete(store, videos))
-	mux.Handle("PUT /api/videos/{id}/walrus", handler.NewWalrusSet(videos))
-	mux.Handle("GET /api/walrus/{blobId}", handler.NewWalrusBlob(cfg))
 
 	// Stream routes (with CORS)
 	cors := middleware.CORS()
@@ -126,10 +116,7 @@ func main() {
 	go func() {
 		slog.Info("orca server starting",
 			"port", cfg.Port,
-			"storage_backend", cfg.StorageBackend,
 			"storage_dir", cfg.StorageDir,
-			"walrus_publisher", cfg.WalrusPublisher,
-			"walrus_aggregator", cfg.WalrusAggregator,
 		)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("server error", "error", err)

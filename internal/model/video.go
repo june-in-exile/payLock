@@ -20,7 +20,6 @@ type Video struct {
 	CreatedAt    string  `json:"created_at"`
 	Duration     float64 `json:"duration,omitempty"`
 	Error        string  `json:"error,omitempty"`
-	WalrusBlobID string  `json:"walrus_blob_id,omitempty"`
 }
 
 type VideoStore struct {
@@ -89,14 +88,6 @@ func (s *VideoStore) SetFailed(id string, errMsg string) {
 	if v, ok := s.videos[id]; ok {
 		v.Status = StatusFailed
 		v.Error = errMsg
-	}
-	s.mu.Unlock()
-}
-
-func (s *VideoStore) SetWalrusBlobID(id string, blobID string) {
-	s.mu.Lock()
-	if v, ok := s.videos[id]; ok {
-		v.WalrusBlobID = blobID
 	}
 	s.mu.Unlock()
 }

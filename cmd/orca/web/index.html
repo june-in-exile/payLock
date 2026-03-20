@@ -59,18 +59,6 @@
       margin-left: 3px;
     }
 
-    nav a {
-      color: var(--text-muted);
-      text-decoration: none;
-      margin-left: 1.5rem;
-      font-size: 0.9rem;
-      transition: color 0.2s;
-    }
-
-    nav a:hover, nav a.active {
-      color: var(--text);
-    }
-
     main {
       max-width: 960px;
       margin: 0 auto;
@@ -86,30 +74,7 @@
       font-weight: 600;
     }
 
-    /* Upload Overlay & FAB */
-    .fab {
-      width: 48px;
-      height: 48px;
-      background: #151515;
-      color: #ffffff;
-      border: 2px solid var(--accent);
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.8rem;
-      font-weight: bold;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-      transition: transform 0.2s, background 0.2s, border-color 0.2s;
-    }
-
-    .fab:hover {
-      background: #222222;
-      border-color: var(--accent-hover);
-      transform: scale(1.05);
-    }
-
+    /* Upload Overlay */
     .upload-overlay {
       position: fixed;
       top: 0;
@@ -236,9 +201,9 @@
       transition: all 0.2s;
     }
 
-    .btn:hover { 
-      background: #222222; 
-      border-color: var(--accent-hover); 
+    .btn:hover {
+      background: #222222;
+      border-color: var(--accent-hover);
     }
 
     .btn-sm {
@@ -253,9 +218,9 @@
       color: #ffffff;
     }
 
-    .btn-outline:hover { 
+    .btn-outline:hover {
       border-color: #666666;
-      background: #222222; 
+      background: #222222;
     }
 
     .btn-danger {
@@ -321,8 +286,6 @@
       border: 1px solid var(--border);
     }
 
-
-
     .back-link {
       display: inline-block;
       color: var(--text-muted);
@@ -348,129 +311,6 @@
     .refresh-btn:hover {
       border-color: var(--text);
       color: var(--text);
-    }
-
-    /* Compare View */
-    .compare-container {
-      display: flex;
-      gap: 1.5rem;
-      flex-wrap: wrap;
-    }
-
-    .compare-panel {
-      flex: 1;
-      min-width: 400px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-    }
-
-    .compare-header {
-      padding: 1rem;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .compare-title {
-      font-weight: 600;
-      font-size: 1rem;
-    }
-
-    .compare-badge {
-      padding: 0.25rem 0.75rem;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      font-weight: 500;
-    }
-
-    .compare-badge.orca {
-      background: rgba(59, 130, 246, 0.15);
-      color: var(--accent);
-    }
-
-    .compare-badge.walrus {
-      background: rgba(168, 85, 247, 0.15);
-      color: #a855f7;
-    }
-
-    .compare-player {
-      background: #000;
-      aspect-ratio: 16/9;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--text-muted);
-      position: relative;
-    }
-
-    .compare-player video {
-      width: 100%;
-      height: 100%;
-    }
-
-    .compare-player .loading {
-      position: absolute;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .compare-stats {
-      padding: 1rem;
-      border-top: 1px solid var(--border);
-    }
-
-    .stat-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 0.5rem 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.85rem;
-    }
-
-    .stat-row:last-child {
-      border-bottom: none;
-    }
-
-    .stat-label {
-      color: var(--text-muted);
-    }
-
-    .stat-value {
-      font-family: monospace;
-      font-weight: 500;
-    }
-
-    .stat-value.fast { color: var(--success); }
-    .stat-value.slow { color: var(--error); }
-    .stat-value.neutral { color: var(--warning); }
-
-    .compare-actions {
-      padding: 0.75rem 1rem;
-      border-top: 1px solid var(--border);
-      display: flex;
-      gap: 0.5rem;
-    }
-
-    .btn-compare {
-      padding: 0.45rem 1rem;
-      font-size: 0.85rem;
-      font-weight: 700;
-      background: #151515;
-      border: 2px solid #444444;
-      color: #ffffff;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn-compare:hover {
-      background: #222222;
-      border-color: #666666;
     }
 
     /* Wallet */
@@ -541,77 +381,6 @@
       display: inline-block;
     }
 
-    .walrus-upload-section {
-      margin-top: 1rem;
-      padding: 1rem;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-    }
-
-    .walrus-upload-section h3 {
-      font-size: 0.95rem;
-      margin-bottom: 0.75rem;
-      color: var(--text);
-    }
-
-    .walrus-upload-status {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-top: 0.5rem;
-    }
-
-    .walrus-progress {
-      height: 4px;
-      background: var(--border);
-      border-radius: 2px;
-      margin-top: 0.5rem;
-      overflow: hidden;
-    }
-
-    .walrus-progress .fill {
-      height: 100%;
-      background: #a855f7;
-      border-radius: 2px;
-      transition: width 0.3s;
-      width: 0%;
-    }
-
-    .btn-walrus {
-      padding: 0.5rem 1.25rem;
-      font-size: 0.9rem;
-      font-weight: 700;
-      background: #151515;
-      border: 2px solid var(--accent);
-      color: #ffffff;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn-walrus:hover {
-      background: #222222;
-      border-color: var(--accent-hover);
-    }
-
-    .btn-walrus:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .wallet-required-msg {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.75rem 1rem;
-      background: rgba(168, 85, 247, 0.08);
-      border: 1px solid rgba(168, 85, 247, 0.2);
-      border-radius: 8px;
-      font-size: 0.85rem;
-      color: #a855f7;
-      margin-top: 0.5rem;
-    }
-
   </style>
 </head>
 <body>
@@ -645,7 +414,7 @@
       <div style="margin-bottom: 1.5rem; padding: 1.25rem; background: var(--surface); border-radius: 8px;">
         <label for="video-title" style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Video Title (optional)</label>
         <input type="text" id="video-title" placeholder="Enter video title" style="width: 100%; padding: 0.6rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem; margin-bottom: 1rem;">
-        
+
         <div style="display:flex; align-items:center; justify-content:space-between;">
           <h2 style="margin-bottom:0;">Videos</h2>
           <div style="display:flex; gap:0.75rem; align-items:center;">
@@ -674,118 +443,14 @@
       <div class="stream-url" id="stream-url"></div>
       <div class="player-actions">
         <button class="btn btn-sm btn-outline" onclick="copyStreamUrl()">Copy URL</button>
-        <button class="btn-compare" id="compare-btn" onclick="goToCompare()" style="display:none;">Compare vs Walrus</button>
         <button class="btn btn-sm btn-danger" id="player-delete-btn" onclick="deleteFromPlayer()">Delete</button>
       </div>
-    </div>
-
-    <!-- Compare view -->
-    <div id="view-compare" class="view">
-      <a class="back-link" onclick="navigate('videos')">&larr; Back to videos</a>
-      <h2>Orca vs Walrus Comparison</h2>
-      <div class="compare-container">
-        <div class="compare-panel" id="orca-panel">
-          <div class="compare-header">
-            <span class="compare-title">Orca (Centralized)</span>
-            <span class="compare-badge orca">Middleware + Local</span>
-          </div>
-          <div class="compare-player" id="orca-player-container">
-            <video id="compare-orca-video" controls muted></video>
-          </div>
-          <div class="compare-stats" id="orca-stats">
-            <div class="stat-row">
-              <span class="stat-label">Status</span>
-              <span class="stat-value" id="orca-status">Loading...</span>
-            </div>
-            <div class="stat-row">
-              <span class="stat-label">TTFB</span>
-              <span class="stat-value" id="orca-ttfb">--</span>
-            </div>
-            <div class="stat-row">
-              <span class="stat-label">First Frame Latency</span>
-              <span class="stat-value" id="orca-first-frame">--</span>
-            </div>
-            <div class="stat-row">
-              <span class="stat-label">Seek Latency</span>
-              <span class="stat-value" id="orca-seek-latency">--</span>
-            </div>
-            <div class="stat-row">
-              <span class="stat-label">Total Loaded</span>
-              <span class="stat-value" id="orca-total-loaded">--</span>
-            </div>
-          </div>
-          <div class="compare-actions">
-            <button class="btn-compare" onclick="simulateSeek('orca')">Test Seek</button>
-          </div>
-        </div>
-        <div class="compare-panel" id="walrus-panel">
-          <div class="compare-header">
-            <span class="compare-title">Walrus (Decentralized)</span>
-            <span class="compare-badge walrus">Direct from Sui</span>
-          </div>
-          <div class="compare-player" id="walrus-player-container">
-            <video id="compare-walrus-video" controls muted></video>
-          </div>
-          <div class="compare-stats" id="walrus-stats">
-            <div class="stat-row">
-              <span class="stat-label">Status</span>
-              <span class="stat-value" id="walrus-status">--</span>
-            </div>
-            <div class="stat-row">
-              <span class="stat-label">TTFB</span>
-              <span class="stat-value" id="walrus-ttfb">--</span>
-            </div>
-            <div class="stat-row">
-              <span class="stat-label">First Frame Latency</span>
-              <span class="stat-value" id="walrus-first-frame">--</span>
-            </div>
-            <div class="stat-row">
-              <span class="stat-label">Seek Latency</span>
-              <span class="stat-value" id="walrus-seek-latency">--</span>
-            </div>
-            <div class="stat-row">
-              <span class="stat-label">Total Loaded</span>
-              <span class="stat-value" id="walrus-total-loaded">--</span>
-            </div>
-            <div class="stat-row">
-              <span class="stat-label">Blob ID</span>
-              <span class="stat-value" id="walrus-blob-id" style="font-size:0.75rem;">--</span>
-            </div>
-          </div>
-          <div class="compare-actions">
-            <button class="btn-compare" onclick="simulateSeek('walrus')">Test Seek</button>
-          </div>
-        </div>
-      </div>
-
-      <div id="walrus-upload-section" class="walrus-upload-section" style="display:none;">
-        <h3>Upload to Walrus</h3>
-        <div id="walrus-upload-content">
-          <div id="walrus-wallet-gate" class="wallet-required-msg">
-            Connect your Slush wallet to upload this video to Walrus decentralized storage.
-          </div>
-          <div id="walrus-upload-ready" style="display:none;">
-            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.75rem;">
-              Store this video on Walrus decentralized storage using your connected wallet.
-            </p>
-            <button class="btn-walrus" id="walrus-upload-btn" onclick="window.uploadToWalrusFromCompare()">
-              Upload to Walrus
-            </button>
-            <div class="walrus-progress" id="walrus-upload-progress" style="display:none;">
-              <div class="fill" id="walrus-progress-fill"></div>
-            </div>
-            <div class="walrus-upload-status" id="walrus-upload-status"></div>
-          </div>
-        </div>
-      </div>
-
     </div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <script type="module">
     // --- Slush Wallet Integration ---
-    const WALRUS_PUBLISHER_URL = 'https://publisher.walrus-testnet.walrus.space';
     const SUI_NETWORK = 'sui:testnet';
 
     let connectedWallet = null;
@@ -813,7 +478,6 @@
         suiClient = new SuiClient({ url: getFullnodeUrl('testnet') });
         window._walletStandard = { getWallets, SuiClient, getFullnodeUrl, suiClient };
 
-        // Collect wallets already registered + listen for future registrations
         const { get, on } = getWallets();
         discoveredWallets = [...get()];
 
@@ -823,7 +487,6 @@
               discoveredWallets.push(w);
             }
           }
-          // Auto-reconnect when saved session exists and slush just appeared
           const savedAddr = sessionStorage.getItem('orca_wallet_addr');
           if (savedAddr && !connectedWallet && findSlushWallet()) {
             autoReconnect();
@@ -838,12 +501,10 @@
 
         unsubscribeWalletEvents = () => { unsubRegister(); unsubUnregister(); };
 
-        // Register Slush wallet adapter (creates iframe, registers asynchronously)
         registerSlushWallet('Orca Video Streaming', {
           origin: 'https://slush.app',
         });
 
-        // If wallet is already available (e.g. browser extension), try reconnect now
         const savedAddr = sessionStorage.getItem('orca_wallet_addr');
         if (savedAddr && findSlushWallet()) {
           await autoReconnect();
@@ -919,8 +580,6 @@
       btn.textContent = 'Connect Wallet';
       btn.className = 'wallet-btn connect';
       document.getElementById('wallet-status').style.display = 'none';
-
-      updateWalrusUploadGate();
     }
 
     async function updateWalletUI() {
@@ -940,7 +599,6 @@
       addrEl.textContent = shortAddr;
       statusEl.style.display = 'flex';
 
-      // Fetch SUI balance
       try {
         const balance = await suiClient.getBalance({ owner: addr });
         const suiAmount = (Number(balance.totalBalance) / 1_000_000_000).toFixed(4);
@@ -948,141 +606,12 @@
       } catch (_) {
         balanceEl.textContent = '-- SUI';
       }
-
-      updateWalrusUploadGate();
     }
 
-    function updateWalrusUploadGate() {
-      const gateEl = document.getElementById('walrus-wallet-gate');
-      const readyEl = document.getElementById('walrus-upload-ready');
-      if (!gateEl || !readyEl) return;
-
-      if (connectedAccount) {
-        gateEl.style.display = 'none';
-        readyEl.style.display = 'block';
-      } else {
-        gateEl.style.display = 'flex';
-        readyEl.style.display = 'none';
-      }
-    }
-
-    async function uploadToWalrusFromCompare() {
-      const videoId = window._compareVideoId;
-      if (!videoId || !connectedAccount) return;
-
-      const btn = document.getElementById('walrus-upload-btn');
-      const statusEl = document.getElementById('walrus-upload-status');
-      const progressEl = document.getElementById('walrus-upload-progress');
-      const fillEl = document.getElementById('walrus-progress-fill');
-
-      btn.disabled = true;
-      btn.textContent = 'Uploading...';
-      statusEl.textContent = 'Fetching video from server...';
-      progressEl.style.display = 'block';
-      fillEl.style.width = '10%';
-
-      try {
-        // Step 1: Fetch the original MP4 from the local stream
-        const statusRes = await fetch('/api/status/' + encodeURIComponent(videoId));
-        if (!statusRes.ok) throw new Error('Failed to get video status');
-        const videoData = await statusRes.json();
-
-        // If already on Walrus, skip
-        if (videoData.walrus_blob_id) {
-          statusEl.textContent = 'Already on Walrus: ' + videoData.walrus_blob_id;
-          btn.disabled = false;
-          btn.textContent = 'Upload to Walrus';
-          progressEl.style.display = 'none';
-          return;
-        }
-
-        fillEl.style.width = '20%';
-        statusEl.textContent = 'Downloading video for Walrus upload...';
-
-        // Fetch the MP4 file from Orca stream
-        const mp4Res = await fetch('/stream/' + encodeURIComponent(videoId) + '/upload.mp4');
-        if (!mp4Res.ok) throw new Error('Failed to fetch video file');
-        const mp4Data = await mp4Res.arrayBuffer();
-
-        fillEl.style.width = '40%';
-        statusEl.textContent = 'Uploading to Walrus (' + (mp4Data.byteLength / 1024 / 1024).toFixed(1) + ' MB)...';
-
-        // Step 2: Upload to Walrus Publisher API
-        const walrusRes = await fetch(WALRUS_PUBLISHER_URL + '/v1/blobs', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/octet-stream' },
-          body: mp4Data,
-        });
-
-        if (!walrusRes.ok) {
-          const errText = await walrusRes.text();
-          throw new Error('Walrus upload failed: ' + errText);
-        }
-
-        fillEl.style.width = '80%';
-        statusEl.textContent = 'Processing Walrus response...';
-
-        const walrusResult = await walrusRes.json();
-        let blobId = null;
-
-        if (walrusResult.newlyCreated) {
-          blobId = walrusResult.newlyCreated?.blobObject?.blobId ?? null;
-        } else if (walrusResult.alreadyCertified) {
-          blobId = walrusResult.alreadyCertified?.blobId ?? null;
-        }
-
-        if (!blobId) throw new Error('No blob ID in Walrus response');
-
-        fillEl.style.width = '90%';
-        statusEl.textContent = 'Registering blob ID with Orca...';
-
-        // Step 3: Report blob ID to backend
-        const setRes = await fetch('/api/videos/' + encodeURIComponent(videoId) + '/walrus', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ blob_id: blobId }),
-        });
-
-        if (!setRes.ok) throw new Error('Failed to register blob ID');
-
-        fillEl.style.width = '100%';
-        statusEl.textContent = 'Stored on Walrus! Blob ID: ' + blobId;
-        statusEl.style.color = 'var(--success)';
-
-        // Update compare view
-        document.getElementById('walrus-blob-id').textContent = blobId;
-        document.getElementById('walrus-status').textContent = 'Playing';
-        document.getElementById('walrus-status').className = 'stat-value success';
-        const walrusVideo = document.getElementById('compare-walrus-video');
-        if (typeof window.loadWalrusCompare === 'function') {
-          window.loadWalrusCompare(walrusVideo, blobId);
-        }
-
-        // Hide the upload section after success
-        setTimeout(() => {
-          document.getElementById('walrus-upload-section').style.display = 'none';
-        }, 3000);
-
-      } catch (err) {
-        statusEl.textContent = 'Error: ' + err.message;
-        statusEl.style.color = 'var(--error)';
-        fillEl.style.width = '0%';
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Upload to Walrus';
-      }
-    }
-
-    // Expose functions to non-module scripts
     window.walletConnect = connectWallet;
-    window.uploadToWalrusFromCompare = uploadToWalrusFromCompare;
     window.isWalletConnected = () => !!connectedAccount;
     window.getWalletAddress = () => connectedAccount ? connectedAccount.address : null;
-    window.updateWalrusUploadGate = updateWalrusUploadGate;
 
-    // Initialize wallet on load
     initWallet();
   </script>
   <script>
@@ -1090,47 +619,27 @@
     let currentView = 'videos';
     let pollInterval = null;
     let navGeneration = 0;
-    let compareOrcaHls = null;
-    let compareWalrusHls = null;
 
     // Navigation
     function navigate(view, params, push = true) {
       navGeneration++;
       currentView = view;
 
-      // Cancel any active polling
       if (pollInterval) {
         clearInterval(pollInterval);
         pollInterval = null;
       }
 
-      // Clean up compare players if they exist
-      if (compareOrcaHls) {
-        compareOrcaHls.destroy();
-        compareOrcaHls = null;
-      }
-      if (compareWalrusHls) {
-        compareWalrusHls.destroy();
-        compareWalrusHls = null;
-      }
-
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       const viewEl = document.getElementById('view-' + view);
       if (viewEl) viewEl.classList.add('active');
-      
+
       if (view === 'videos') {
         loadVideos();
         if (push) history.pushState({view}, '', '/');
       } else if (view === 'player' && params && params.id) {
         if (push) history.pushState({view, id: params.id}, '', '/play/' + params.id);
         loadPlayer(params.id);
-      } else if (view === 'compare') {
-        if (params && params.id) {
-          if (push) history.pushState({view, id: params.id}, '', '/' + params.id);
-          loadCompareView(params.id);
-        } else {
-          navigate('videos', null, push);
-        }
       }
     }
 
@@ -1181,44 +690,19 @@
       info.appendChild(meta);
       card.appendChild(info);
 
-      if (v.status === 'ready') {
-        const actions = document.createElement('div');
-        actions.className = 'video-actions';
+      const actions = document.createElement('div');
+      actions.className = 'video-actions';
 
-        const compareBtn = document.createElement('button');
-        compareBtn.className = 'btn btn-sm btn-outline';
-        compareBtn.textContent = 'Compare';
-        compareBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          navigate('compare', { id: v.id });
-        });
-        actions.appendChild(compareBtn);
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn btn-sm btn-danger';
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteVideo(v.id);
+      });
+      actions.appendChild(deleteBtn);
 
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'btn btn-sm btn-danger';
-        deleteBtn.textContent = 'Delete';
-        deleteBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          deleteVideo(v.id);
-        });
-        actions.appendChild(deleteBtn);
-
-        card.appendChild(actions);
-      } else {
-        const actions = document.createElement('div');
-        actions.className = 'video-actions';
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'btn btn-sm btn-danger';
-        deleteBtn.textContent = 'Delete';
-        deleteBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          deleteVideo(v.id);
-        });
-        actions.appendChild(deleteBtn);
-
-        card.appendChild(actions);
-      }
+      card.appendChild(actions);
 
       return card;
     }
@@ -1264,7 +748,7 @@
         const videos = data.videos || [];
 
         if (videos.length === 0) {
-          setEmptyState(container, 'No videos yet. Drag and drop a file or click + to upload.');
+          setEmptyState(container, 'No videos yet. Drag and drop a file or click Upload MP4.');
           return;
         }
 
@@ -1331,10 +815,6 @@
 
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/api/upload');
-      // When wallet is connected, tell backend to skip Walrus upload (frontend handles it)
-      if (typeof window.isWalletConnected === 'function' && window.isWalletConnected()) {
-        xhr.setRequestHeader('X-Walrus-Client', 'true');
-      }
 
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
@@ -1381,7 +861,6 @@
 
       videoIdEl.textContent = id;
 
-      // Clean up previous player
       if (hls) {
         hls.destroy();
         hls = null;
@@ -1397,7 +876,6 @@
       const urlEl = document.getElementById('stream-url');
       const titleEl = document.getElementById('player-video-title');
 
-      // Abort if user navigated away
       if (generation !== navGeneration) return;
 
       try {
@@ -1420,7 +898,6 @@
           const streamUrl = window.location.origin + '/stream/' + encodeURIComponent(id) + '/index.m3u8';
           urlEl.textContent = streamUrl;
           startPlayer(videoEl, streamUrl);
-          document.getElementById('compare-btn').style.display = '';
         } else if (video.status === 'processing') {
           urlEl.textContent = 'Processing... will auto-play when ready.';
           pollInterval = setInterval(async () => {
@@ -1447,7 +924,6 @@
                 const sUrl = window.location.origin + '/stream/' + encodeURIComponent(id) + '/index.m3u8';
                 urlEl.textContent = sUrl;
                 startPlayer(videoEl, sUrl);
-                document.getElementById('compare-btn').style.display = '';
               } else if (v.status === 'failed') {
                 clearInterval(pollInterval);
                 pollInterval = null;
@@ -1475,7 +951,6 @@
           videoEl.play().catch(() => {});
         });
       } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-        // Safari native HLS
         videoEl.src = url;
         videoEl.addEventListener('loadedmetadata', () => {
           videoEl.play().catch(() => {});
@@ -1519,283 +994,11 @@
       } else if (path.startsWith('/play/')) {
         const id = path.slice(6);
         navigate('player', { id: id }, false);
-      } else if (path.length > 1) {
-        // Assume it's /{id} for compare
-        const id = path.slice(1);
-        navigate('compare', { id: id }, false);
       } else {
         navigate('videos', null, false);
       }
     }
 
-    // Compare View
-    let compareVideoId = null;
-    let orcaFirstFrameTime = null;
-
-    function goToCompare() {
-      const id = document.getElementById('player-video-id').textContent;
-      navigate('compare', { id: id });
-    }
-
-    async function loadCompareView(id) {
-      compareVideoId = id;
-      window._compareVideoId = id;
-      orcaFirstFrameTime = null;
-
-      // Clean up previous players
-      if (compareOrcaHls) {
-        compareOrcaHls.destroy();
-        compareOrcaHls = null;
-      }
-      if (compareWalrusHls) {
-        compareWalrusHls.destroy();
-        compareWalrusHls = null;
-      }
-
-      const orcaVideo = document.getElementById('compare-orca-video');
-      const walrusVideo = document.getElementById('compare-walrus-video');
-      orcaVideo.removeAttribute('src');
-      walrusVideo.removeAttribute('src');
-
-      // Reset stats
-      document.getElementById('orca-status').textContent = 'Loading...';
-      document.getElementById('orca-status').className = 'stat-value';
-      document.getElementById('orca-ttfb').textContent = '--';
-      document.getElementById('orca-ttfb').className = 'stat-value';
-      document.getElementById('orca-first-frame').textContent = '--';
-      document.getElementById('orca-first-frame').className = 'stat-value';
-      document.getElementById('orca-seek-latency').textContent = '--';
-      document.getElementById('orca-seek-latency').className = 'stat-value';
-      document.getElementById('orca-total-loaded').textContent = '--';
-      document.getElementById('orca-total-loaded').className = 'stat-value';
-      document.getElementById('walrus-status').textContent = '--';
-      document.getElementById('walrus-status').className = 'stat-value';
-      document.getElementById('walrus-ttfb').textContent = '--';
-      document.getElementById('walrus-ttfb').className = 'stat-value';
-      document.getElementById('walrus-first-frame').textContent = '--';
-      document.getElementById('walrus-first-frame').className = 'stat-value';
-      document.getElementById('walrus-seek-latency').textContent = '--';
-      document.getElementById('walrus-seek-latency').className = 'stat-value';
-      document.getElementById('walrus-total-loaded').textContent = '--';
-      document.getElementById('walrus-total-loaded').className = 'stat-value';
-      document.getElementById('walrus-blob-id').textContent = '--';
-
-      try {
-        const res = await fetch('/api/status/' + encodeURIComponent(id));
-
-        if (!res.ok) {
-          document.getElementById('orca-status').textContent = 'Error';
-          document.getElementById('orca-status').className = 'stat-value slow';
-          return;
-        }
-
-        const video = await res.json();
-
-        if (video.status !== 'ready') {
-          document.getElementById('orca-status').textContent = video.status;
-          document.getElementById('orca-status').className = 'stat-value neutral';
-          return;
-        }
-
-        // Start Orca playback
-        const orcaManifest = window.location.origin + '/stream/' + encodeURIComponent(id) + '/index.m3u8';
-        startCompareOrca(orcaVideo, orcaManifest, video.id);
-
-        // Start Walrus playback (real)
-        if (video.walrus_blob_id) {
-          document.getElementById('walrus-blob-id').textContent = video.walrus_blob_id;
-          loadWalrusCompare(walrusVideo, video.walrus_blob_id);
-          document.getElementById('walrus-upload-section').style.display = 'none';
-        } else {
-          document.getElementById('walrus-status').textContent = 'Not on Walrus';
-          document.getElementById('walrus-status').className = 'stat-value neutral';
-          document.getElementById('walrus-blob-id').textContent = 'Not uploaded';
-          // Show upload section for wallet-based Walrus upload
-          document.getElementById('walrus-upload-section').style.display = 'block';
-          document.getElementById('walrus-upload-status').textContent = '';
-          document.getElementById('walrus-upload-status').style.color = '';
-          if (typeof window.updateWalrusUploadGate === 'function') {
-            window.updateWalrusUploadGate();
-          }
-        }
-
-      } catch (err) {
-        document.getElementById('orca-status').textContent = 'Error';
-        document.getElementById('orca-status').className = 'stat-value slow';
-      }
-    }
-
-    function formatBytes(bytes) {
-      if (bytes < 1024) return bytes + ' B';
-      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-      return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-    }
-
-    function classifyLatency(ms, goodThreshold, okThreshold) {
-      if (ms <= goodThreshold) return 'stat-value fast';
-      if (ms <= okThreshold) return 'stat-value neutral';
-      return 'stat-value slow';
-    }
-
-    function startCompareOrca(videoEl, manifestUrl, id) {
-      const startTime = performance.now();
-      let orcaTotalBytes = 0;
-
-      if (Hls.isSupported()) {
-        compareOrcaHls = new Hls({
-          enableWorker: true,
-          lowLatencyMode: true,
-          xhrSetup: function(xhr, url) {
-            const bustUrl = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
-            xhr.open('GET', bustUrl, true);
-          }
-        });
-
-        compareOrcaHls.loadSource(manifestUrl);
-        compareOrcaHls.attachMedia(videoEl);
-
-        // TTFB: time until manifest response arrives
-        compareOrcaHls.on(Hls.Events.MANIFEST_LOADED, () => {
-          const ttfb = performance.now() - startTime;
-          const el = document.getElementById('orca-ttfb');
-          el.textContent = ttfb.toFixed(0) + 'ms';
-          el.className = classifyLatency(ttfb, 100, 300);
-        });
-
-        compareOrcaHls.on(Hls.Events.MANIFEST_PARSED, () => {
-          document.getElementById('orca-status').textContent = 'Playing';
-          document.getElementById('orca-status').className = 'stat-value fast';
-          videoEl.play().catch(() => {});
-        });
-
-        // Track total loaded bytes from fragments
-        compareOrcaHls.on(Hls.Events.FRAG_LOADED, (event, data) => {
-          if (data.frag && data.frag.stats) {
-            orcaTotalBytes += data.frag.stats.loaded || 0;
-          }
-          const el = document.getElementById('orca-total-loaded');
-          el.textContent = formatBytes(orcaTotalBytes);
-        });
-
-        compareOrcaHls.on(Hls.Events.ERROR, (event, data) => {
-          if (data.fatal) {
-            document.getElementById('orca-status').textContent = 'Error';
-            document.getElementById('orca-status').className = 'stat-value slow';
-          }
-        });
-
-        videoEl.addEventListener('playing', () => {
-          if (!orcaFirstFrameTime) {
-            orcaFirstFrameTime = performance.now() - startTime;
-            const el = document.getElementById('orca-first-frame');
-            el.textContent = orcaFirstFrameTime.toFixed(0) + 'ms';
-            el.className = classifyLatency(orcaFirstFrameTime, 200, 500);
-          }
-        }, { once: true });
-
-      } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-        videoEl.src = manifestUrl;
-        videoEl.addEventListener('loadedmetadata', () => {
-          document.getElementById('orca-status').textContent = 'Playing';
-          document.getElementById('orca-status').className = 'stat-value fast';
-          videoEl.play().catch(() => {});
-        });
-        videoEl.addEventListener('playing', () => {
-          if (!orcaFirstFrameTime) {
-            orcaFirstFrameTime = performance.now() - startTime;
-            const el = document.getElementById('orca-first-frame');
-            el.textContent = orcaFirstFrameTime.toFixed(0) + 'ms';
-            el.className = classifyLatency(orcaFirstFrameTime, 200, 500);
-          }
-        }, { once: true });
-      }
-    }
-
-    window.loadWalrusCompare = loadWalrusCompare;
-    async function loadWalrusCompare(videoEl, blobId) {
-      const startTime = performance.now();
-      let firstFrameDone = false;
-      let ttfbDone = false;
-
-      document.getElementById('walrus-status').textContent = 'Fetching...';
-      document.getElementById('walrus-status').className = 'stat-value neutral';
-
-      try {
-        const streamUrl = '/api/walrus/' + encodeURIComponent(blobId) + '?_t=' + Date.now();
-
-        // Fetch total size via HEAD request (non-blocking)
-        fetch(streamUrl, { method: 'HEAD', cache: 'no-store' }).then(res => {
-          const contentLength = res.headers.get('Content-Length');
-          if (contentLength) {
-            document.getElementById('walrus-total-loaded').textContent = formatBytes(parseInt(contentLength, 10));
-          }
-        }).catch(() => {});
-
-        videoEl.src = streamUrl;
-
-        // TTFB: first progress event means bytes are arriving
-        videoEl.addEventListener('progress', () => {
-          if (!ttfbDone) {
-            ttfbDone = true;
-            const ttfb = performance.now() - startTime;
-            const el = document.getElementById('walrus-ttfb');
-            el.textContent = ttfb.toFixed(0) + 'ms';
-            el.className = classifyLatency(ttfb, 100, 300);
-          }
-        });
-
-        videoEl.addEventListener('loadedmetadata', () => {
-          document.getElementById('walrus-status').textContent = 'Playing';
-          document.getElementById('walrus-status').className = 'stat-value fast';
-          videoEl.play().catch(() => {});
-        });
-
-        videoEl.addEventListener('playing', () => {
-          if (!firstFrameDone) {
-            firstFrameDone = true;
-            const latency = performance.now() - startTime;
-            const el = document.getElementById('walrus-first-frame');
-            el.textContent = latency.toFixed(0) + 'ms';
-            el.className = classifyLatency(latency, 200, 500);
-          }
-        }, { once: true });
-
-        videoEl.addEventListener('error', () => {
-          document.getElementById('walrus-status').textContent = 'Error';
-          document.getElementById('walrus-status').className = 'stat-value slow';
-        });
-
-      } catch (err) {
-        document.getElementById('walrus-status').textContent = 'Error';
-        document.getElementById('walrus-status').className = 'stat-value slow';
-      }
-    }
-
-    function simulateSeek(type) {
-      const videoEl = type === 'orca' 
-        ? document.getElementById('compare-orca-video')
-        : document.getElementById('compare-walrus-video');
-      const latencyEl = document.getElementById(type + '-seek-latency');
-
-      if (!videoEl.duration) return;
-
-      const startTime = performance.now();
-      // Seek to a random point between 10% and 90% of the video
-      const targetTime = videoEl.duration * (0.1 + Math.random() * 0.8);
-
-      videoEl.currentTime = targetTime;
-
-      const seekHandler = () => {
-        const latency = performance.now() - startTime;
-        latencyEl.textContent = latency.toFixed(0) + 'ms';
-        latencyEl.className = classifyLatency(latency, 300, 1000);
-        videoEl.removeEventListener('seeked', seekHandler);
-      };
-
-      videoEl.addEventListener('seeked', seekHandler);
-    }
-
-    // Router init (must be after all let/const declarations to avoid TDZ errors)
     window.addEventListener('popstate', handleRoute);
     handleRoute();
   </script>

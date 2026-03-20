@@ -9,11 +9,11 @@ import (
 )
 
 type Delete struct {
-	store  storage.Backend
+	store  *storage.LocalStorage
 	videos *model.VideoStore
 }
 
-func NewDelete(store storage.Backend, videos *model.VideoStore) *Delete {
+func NewDelete(store *storage.LocalStorage, videos *model.VideoStore) *Delete {
 	return &Delete{store: store, videos: videos}
 }
 
