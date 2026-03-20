@@ -483,6 +483,8 @@
           <button class="btn" id="paywall-unlock-btn" onclick="playFull()">Play Full Video</button>
           <div class="paywall-label" style="font-size: 0.75rem; margin-top: 0.5rem;">In Phase 2, this will require payment via Seal</div>
         </div>
+        <div id="chain-status" style="display:none; margin-top: 0.75rem; padding: 0.75rem 1rem; background: var(--surface); border-radius: 8px; font-size: 0.85rem;">
+        </div>
       </div>
       <div class="stream-url" id="stream-url"></div>
       <div class="player-actions">
@@ -501,22 +503,40 @@
     let suiClient = null;
     let discoveredWallets = [];
     let unsubscribeWalletEvents = null;
+    let Transaction = null;
+    let signAndExecuteTransaction = null;
+    let paywallPackageId = null;
 
     function findSlushWallet() {
       return discoveredWallets.find(w => w.name.toLowerCase().includes('slush'));
     }
 
+    async function fetchAppConfig() {
+      try {
+        const res = await fetch('/api/config');
+        if (res.ok) {
+          const cfg = await res.json();
+          paywallPackageId = cfg.paywall_package_id || null;
+        }
+      } catch (_) {}
+    }
+
     async function initWallet() {
       try {
-        const [slushMod, walletMod, suiMod] = await Promise.all([
+        const [slushMod, walletMod, suiMod, txMod, walletStdMod, configResult] = await Promise.all([
           import('https://esm.sh/@mysten/slush-wallet@1.0.3?bundle'),
           import('https://esm.sh/@wallet-standard/app@1.1.0?bundle'),
           import('https://esm.sh/@mysten/sui@1.21.1/client?bundle'),
+          import('https://esm.sh/@mysten/sui@1.21.1/transactions?bundle'),
+          import('https://esm.sh/@mysten/wallet-standard@0.13.9?bundle'),
+          fetchAppConfig(),
         ]);
 
         const { registerSlushWallet } = slushMod;
         const { getWallets } = walletMod;
         const { SuiClient, getFullnodeUrl } = suiMod;
+        Transaction = txMod.Transaction;
+        signAndExecuteTransaction = walletStdMod.signAndExecuteTransaction;
 
         suiClient = new SuiClient({ url: getFullnodeUrl('testnet') });
         window._walletStandard = { getWallets, SuiClient, getFullnodeUrl, suiClient };
@@ -651,9 +671,71 @@
       }
     }
 
+    async function createVideoOnChain(videoId, price, previewBlobId, fullBlobId) {
+      if (!connectedWallet || !connectedAccount) {
+        throw new Error('Wallet not connected');
+      }
+      if (!paywallPackageId) {
+        throw new Error('Paywall contract not configured');
+      }
+      if (!Transaction || !signAndExecuteTransaction) {
+        throw new Error('Sui SDK not loaded');
+      }
+
+      if (!/^0x[0-9a-fA-F]{64}$/.test(paywallPackageId)) {
+        throw new Error('Invalid paywall package ID format');
+      }
+
+      const tx = new Transaction();
+      tx.moveCall({
+        target: paywallPackageId + '::paywall::create_video',
+        arguments: [
+          tx.pure.u64(price),
+          tx.pure.string(previewBlobId),
+          tx.pure.string(fullBlobId),
+        ],
+      });
+
+      const result = await signAndExecuteTransaction(connectedWallet, {
+        transaction: tx,
+        account: connectedAccount,
+        chain: SUI_NETWORK,
+      });
+
+      const txResponse = await suiClient.waitForTransaction({
+        digest: result.digest,
+        options: { showObjectChanges: true },
+      });
+
+      const videoType = paywallPackageId + '::paywall::Video';
+      const created = (txResponse.objectChanges || []).find(
+        c => c.type === 'created' && c.objectType === videoType
+      );
+
+      if (!created) {
+        throw new Error('Video object not found in transaction result');
+      }
+
+      const suiObjectId = created.objectId;
+
+      const res = await fetch('/api/videos/' + encodeURIComponent(videoId) + '/sui-object', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sui_object_id: suiObjectId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error('Failed to save Sui object ID: ' + (body.error || res.status));
+      }
+
+      return suiObjectId;
+    }
+
     window.walletConnect = connectWallet;
     window.isWalletConnected = () => !!connectedAccount;
     window.getWalletAddress = () => connectedAccount ? connectedAccount.address : null;
+    window.createVideoOnChain = createVideoOnChain;
+    window.getPaywallPackageId = () => paywallPackageId;
 
     initWallet();
   </script>
@@ -954,6 +1036,69 @@
         setupPreviewEndHandler(videoEl, video);
       }
       videoEl.play().catch(() => {});
+
+      updateChainStatus(video);
+    }
+
+    function updateChainStatus(video) {
+      const chainEl = document.getElementById('chain-status');
+      if (!chainEl) return;
+
+      if (video.sui_object_id) {
+        chainEl.style.display = 'block';
+        chainEl.innerHTML = '<span style="color:var(--success);">On-chain</span> <span style="font-family:monospace; color:var(--text-muted); font-size:0.75rem;">' +
+          video.sui_object_id.slice(0, 10) + '...' + video.sui_object_id.slice(-4) + '</span>';
+        return;
+      }
+
+      if (video.price > 0 && window.isWalletConnected() && window.getPaywallPackageId()) {
+        chainEl.style.display = 'block';
+        chainEl.innerHTML = '<button class="btn btn-sm" id="publish-chain-btn" onclick="publishToChain()">Publish to Sui</button>' +
+          ' <span style="color:var(--text-muted); font-size:0.8rem;">Create on-chain Video object for paywall</span>';
+      } else if (video.price > 0 && !video.sui_object_id) {
+        chainEl.style.display = 'block';
+        if (!window.getPaywallPackageId || !window.getPaywallPackageId()) {
+          chainEl.innerHTML = '<span style="color:var(--text-muted);">Contract not configured (set ORCA_PAYWALL_PACKAGE_ID)</span>';
+        } else {
+          chainEl.innerHTML = '<span style="color:var(--text-muted);">Connect wallet to publish on-chain</span>';
+        }
+      } else {
+        chainEl.style.display = 'none';
+      }
+    }
+
+    async function publishToChain() {
+      if (!currentVideo) return;
+      const chainEl = document.getElementById('chain-status');
+      const btn = document.getElementById('publish-chain-btn');
+
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Signing...';
+      }
+
+      try {
+        const suiObjectId = await window.createVideoOnChain(
+          currentVideo.id,
+          currentVideo.price,
+          currentVideo.preview_blob_id,
+          currentVideo.full_blob_id
+        );
+        currentVideo.sui_object_id = suiObjectId;
+        updateChainStatus(currentVideo);
+      } catch (err) {
+        chainEl.textContent = '';
+        const errSpan = document.createElement('span');
+        errSpan.style.color = 'var(--error)';
+        errSpan.textContent = 'Failed: ' + err.message;
+        chainEl.appendChild(errSpan);
+        const retryBtn = document.createElement('button');
+        retryBtn.className = 'btn btn-sm';
+        retryBtn.style.marginLeft = '0.5rem';
+        retryBtn.textContent = 'Retry';
+        retryBtn.addEventListener('click', publishToChain);
+        chainEl.appendChild(retryBtn);
+      }
     }
 
     function playFull() {

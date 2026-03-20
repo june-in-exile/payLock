@@ -24,6 +24,8 @@ go test ./internal/processor/... -run TestValidateMagicBytes -v
 | `ORCA_WALRUS_AGGREGATOR_URL` | `https://aggregator.walrus-testnet.walrus.space` | Walrus aggregator endpoint |
 | `ORCA_WALRUS_EPOCHS` | `5` | Number of storage epochs to pay for |
 | `ORCA_MAX_FILE_SIZE_MB` | `500` | Upload size limit in MB |
+| `ORCA_PAYWALL_PACKAGE_ID` | *(none)* | Deployed paywall Move package ID on Sui |
+| `ORCA_SUI_RPC_URL` | `https://fullnode.testnet.sui.io:443` | Sui JSON-RPC endpoint |
 
 ## Architecture
 
@@ -33,6 +35,7 @@ Orca is a video upload service that stores MP4 files on Walrus decentralized sto
 cmd/orca/main.go          — wires all packages; route groups:
                             POST /api/upload, GET /api/status/{id}
                             GET /api/videos, DELETE /api/videos/{id}
+                            PUT /api/videos/{id}/sui-object, GET /api/config
                             GET /stream/{id}                        → redirects to Walrus
 
 internal/config/          — env-based config
