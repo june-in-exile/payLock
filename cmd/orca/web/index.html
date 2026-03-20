@@ -1644,7 +1644,11 @@
       if (Hls.isSupported()) {
         compareOrcaHls = new Hls({
           enableWorker: true,
-          lowLatencyMode: true
+          lowLatencyMode: true,
+          xhrSetup: function(xhr, url) {
+            const bustUrl = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
+            xhr.open('GET', bustUrl, true);
+          }
         });
 
         compareOrcaHls.loadSource(manifestUrl);
@@ -1717,10 +1721,10 @@
       document.getElementById('walrus-status').className = 'stat-value neutral';
 
       try {
-        const streamUrl = '/api/walrus/' + encodeURIComponent(blobId);
+        const streamUrl = '/api/walrus/' + encodeURIComponent(blobId) + '?_t=' + Date.now();
 
         // Fetch total size via HEAD request (non-blocking)
-        fetch(streamUrl, { method: 'HEAD' }).then(res => {
+        fetch(streamUrl, { method: 'HEAD', cache: 'no-store' }).then(res => {
           const contentLength = res.headers.get('Content-Length');
           if (contentLength) {
             document.getElementById('walrus-total-loaded').textContent = formatBytes(parseInt(contentLength, 10));

@@ -55,6 +55,7 @@ func (h *Stream) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case ".m3u8":
 		filePath, err = h.store.ManifestPath(id)
 		w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+		w.Header().Set("Cache-Control", "no-store")
 	case ".ts":
 		filePath, err = h.store.SegmentPath(id, file)
 		w.Header().Set("Content-Type", "video/mp2t")
