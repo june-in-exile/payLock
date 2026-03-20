@@ -14,13 +14,18 @@ const (
 )
 
 type Video struct {
-	ID        string `json:"id"`
-	Title     string `json:"title"`
-	Status    Status `json:"status"`
-	CreatedAt string `json:"created_at"`
-	BlobID    string `json:"blob_id,omitempty"`
-	BlobURL   string `json:"blob_url,omitempty"`
-	Error     string `json:"error,omitempty"`
+	ID             string `json:"id"`
+	Title          string `json:"title"`
+	Status         Status `json:"status"`
+	CreatedAt      string `json:"created_at"`
+	Price          uint64 `json:"price"`
+	Creator        string `json:"creator,omitempty"`
+	PreviewBlobID  string `json:"preview_blob_id,omitempty"`
+	PreviewBlobURL string `json:"preview_blob_url,omitempty"`
+	FullBlobID     string `json:"full_blob_id,omitempty"`
+	FullBlobURL    string `json:"full_blob_url,omitempty"`
+	SuiObjectID    string `json:"sui_object_id,omitempty"`
+	Error          string `json:"error,omitempty"`
 }
 
 type VideoStore struct {
@@ -34,12 +39,14 @@ func NewVideoStore() *VideoStore {
 	}
 }
 
-func (s *VideoStore) Create(id, title string) *Video {
+func (s *VideoStore) Create(id, title string, price uint64, creator string) *Video {
 	v := &Video{
 		ID:        id,
 		Title:     title,
 		Status:    StatusProcessing,
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		Price:     price,
+		Creator:   creator,
 	}
 	s.mu.Lock()
 	s.videos[id] = v
@@ -58,14 +65,27 @@ func (s *VideoStore) Get(id string) (*Video, bool) {
 	return &copied, true
 }
 
-func (s *VideoStore) SetReady(id, blobID, blobURL string) {
+func (s *VideoStore) SetReady(id, previewBlobID, previewBlobURL, fullBlobID, fullBlobURL string) {
 	s.mu.Lock()
 	if v, ok := s.videos[id]; ok {
 		v.Status = StatusReady
-		v.BlobID = blobID
-		v.BlobURL = blobURL
+		v.PreviewBlobID = previewBlobID
+		v.PreviewBlobURL = previewBlobURL
+		v.FullBlobID = fullBlobID
+		v.FullBlobURL = fullBlobURL
 	}
 	s.mu.Unlock()
+}
+
+func (s *VideoStore) SetSuiObjectID(id, suiObjectID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, ok := s.videos[id]
+	if !ok {
+		return false
+	}
+	v.SuiObjectID = suiObjectID
+	return true
 }
 
 func (s *VideoStore) SetFailed(id string, errMsg string) {

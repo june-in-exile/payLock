@@ -297,6 +297,41 @@
 
     .back-link:hover { color: var(--text); }
 
+    .price-badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      font-family: monospace;
+    }
+
+    .price-badge.paid { background: rgba(56, 152, 255, 0.15); color: var(--accent); }
+    .price-badge.free { background: rgba(255, 255, 255, 0.08); color: var(--text-muted); }
+
+    .paywall-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      z-index: 10;
+    }
+
+    .paywall-overlay .paywall-price {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .paywall-overlay .paywall-label {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
     .refresh-btn {
       background: none;
       border: 1px solid var(--border);
@@ -413,7 +448,10 @@
 
       <div style="margin-bottom: 1.5rem; padding: 1.25rem; background: var(--surface); border-radius: 8px;">
         <label for="video-title" style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Video Title (optional)</label>
-        <input type="text" id="video-title" placeholder="Enter video title" style="width: 100%; padding: 0.6rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem; margin-bottom: 1rem;">
+        <input type="text" id="video-title" placeholder="Enter video title" style="width: 100%; padding: 0.6rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem; margin-bottom: 0.75rem;">
+
+        <label for="video-price" style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Price in SUI (0 = free)</label>
+        <input type="number" id="video-price" placeholder="0" min="0" step="0.01" style="width: 100%; padding: 0.6rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem; margin-bottom: 1rem;">
 
         <div style="display:flex; align-items:center; justify-content:space-between;">
           <h2 style="margin-bottom:0;">Videos</h2>
@@ -437,8 +475,14 @@
         </div>
         <span class="status-badge" id="player-status"></span>
       </div>
-      <div class="player-container">
+      <div class="player-container" style="position: relative;">
         <video id="video-player" controls></video>
+        <div class="paywall-overlay" id="paywall-overlay" style="display: none;">
+          <div class="paywall-label">Preview ended</div>
+          <div class="paywall-price" id="paywall-price"></div>
+          <button class="btn" id="paywall-unlock-btn" onclick="playFull()">Play Full Video</button>
+          <div class="paywall-label" style="font-size: 0.75rem; margin-top: 0.5rem;">In Phase 2, this will require payment via Seal</div>
+        </div>
       </div>
       <div class="stream-url" id="stream-url"></div>
       <div class="player-actions">
@@ -678,6 +722,16 @@
       statusBadge.textContent = v.status;
       meta.appendChild(statusBadge);
 
+      const priceBadge = document.createElement('span');
+      if (v.price > 0) {
+        priceBadge.className = 'price-badge paid';
+        priceBadge.textContent = (v.price / 1_000_000_000).toFixed(2) + ' SUI';
+      } else {
+        priceBadge.className = 'price-badge free';
+        priceBadge.textContent = 'Free';
+      }
+      meta.appendChild(priceBadge);
+
       const dateEl = document.createElement('span');
       dateEl.textContent = formatDate(v.created_at);
       meta.appendChild(dateEl);
@@ -807,6 +861,15 @@
       if (title) {
         formData.append('title', title);
       }
+      const priceInput = document.getElementById('video-price').value;
+      if (priceInput && parseFloat(priceInput) > 0) {
+        const priceMist = Math.round(parseFloat(priceInput) * 1_000_000_000);
+        formData.append('price', priceMist.toString());
+      }
+      const walletAddr = window.getWalletAddress ? window.getWalletAddress() : null;
+      if (walletAddr) {
+        formData.append('creator', walletAddr);
+      }
 
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/api/upload');
@@ -825,6 +888,7 @@
           const data = JSON.parse(xhr.responseText);
           uploadFile.value = '';
           document.getElementById('video-title').value = '';
+          document.getElementById('video-price').value = '';
           navigate('player', { id: data.id });
         } else {
           let msg = 'Upload failed.';
@@ -848,18 +912,64 @@
     }
 
     // Player
+    let currentVideo = null;
+
     function loadPlayer(id) {
       const videoEl = document.getElementById('video-player');
       const videoIdEl = document.getElementById('player-video-id');
+      const paywallEl = document.getElementById('paywall-overlay');
 
       videoIdEl.textContent = id;
       videoEl.removeAttribute('src');
+      paywallEl.style.display = 'none';
+      currentVideo = null;
 
       checkAndPlay(id, navGeneration);
     }
 
-    async function checkAndPlay(id, generation) {
+    function setupPreviewEndHandler(videoEl, video) {
+      videoEl.onended = null;
+      if (video.price > 0 && video.preview_blob_url !== video.full_blob_url) {
+        videoEl.onended = function() {
+          const paywallEl = document.getElementById('paywall-overlay');
+          const priceEl = document.getElementById('paywall-price');
+          priceEl.textContent = (video.price / 1_000_000_000).toFixed(2) + ' SUI';
+          paywallEl.style.display = 'flex';
+        };
+      }
+    }
+
+    function startPlayback(video) {
       const videoEl = document.getElementById('video-player');
+      const urlEl = document.getElementById('stream-url');
+
+      currentVideo = video;
+
+      if (video.price === 0 && video.full_blob_url) {
+        urlEl.textContent = video.full_blob_url;
+        videoEl.src = video.full_blob_url;
+      } else {
+        urlEl.textContent = video.preview_blob_url;
+        videoEl.src = video.preview_blob_url;
+        setupPreviewEndHandler(videoEl, video);
+      }
+      videoEl.play().catch(() => {});
+    }
+
+    function playFull() {
+      if (!currentVideo) return;
+      const videoEl = document.getElementById('video-player');
+      const urlEl = document.getElementById('stream-url');
+      const paywallEl = document.getElementById('paywall-overlay');
+
+      paywallEl.style.display = 'none';
+      videoEl.onended = null;
+      urlEl.textContent = currentVideo.full_blob_url;
+      videoEl.src = currentVideo.full_blob_url;
+      videoEl.play().catch(() => {});
+    }
+
+    async function checkAndPlay(id, generation) {
       const statusEl = document.getElementById('player-status');
       const urlEl = document.getElementById('stream-url');
       const titleEl = document.getElementById('player-video-title');
@@ -883,10 +993,7 @@
         statusEl.className = 'status-badge ' + safeStatus;
 
         if (video.status === 'ready') {
-          const blobUrl = video.blob_url;
-          urlEl.textContent = blobUrl;
-          videoEl.src = blobUrl;
-          videoEl.play().catch(() => {});
+          startPlayback(video);
         } else if (video.status === 'processing') {
           urlEl.textContent = 'Uploading to Walrus... will auto-play when ready.';
           pollInterval = setInterval(async () => {
@@ -910,9 +1017,7 @@
               if (v.status === 'ready') {
                 clearInterval(pollInterval);
                 pollInterval = null;
-                urlEl.textContent = v.blob_url;
-                videoEl.src = v.blob_url;
-                videoEl.play().catch(() => {});
+                startPlayback(v);
               } else if (v.status === 'failed') {
                 clearInterval(pollInterval);
                 pollInterval = null;

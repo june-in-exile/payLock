@@ -36,9 +36,9 @@ func TestVideos_EmptyList(t *testing.T) {
 
 func TestVideos_ReturnsList(t *testing.T) {
 	videos := model.NewVideoStore()
-	videos.Create("vid-001", "Title 1")
-	videos.Create("vid-002", "Title 2")
-	videos.SetReady("vid-001", "blob1", "https://agg/v1/blobs/blob1")
+	videos.Create("vid-001", "Title 1", 0, "")
+	videos.Create("vid-002", "Title 2", 0, "")
+	videos.SetReady("vid-001", "blob1", "https://agg/v1/blobs/blob1", "blob1", "https://agg/v1/blobs/blob1")
 
 	h := NewVideos(videos)
 

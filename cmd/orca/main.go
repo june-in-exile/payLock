@@ -15,6 +15,7 @@ import (
 	"github.com/anthropics/orca/internal/handler"
 	"github.com/anthropics/orca/internal/middleware"
 	"github.com/anthropics/orca/internal/model"
+	"github.com/anthropics/orca/internal/processor"
 	"github.com/anthropics/orca/internal/walrus"
 )
 
@@ -25,6 +26,11 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
+		os.Exit(1)
+	}
+
+	if err := processor.CheckFFmpeg(cfg.FFmpegPath); err != nil {
+		slog.Error("ffmpeg is required but not found", "error", err)
 		os.Exit(1)
 	}
 
@@ -39,9 +45,10 @@ func main() {
 	mux.Handle("GET /api/videos", handler.NewVideos(videos))
 	mux.Handle("DELETE /api/videos/{id}", handler.NewDelete(videos))
 
-	// Stream route — redirects to Walrus aggregator
+	// Stream routes — redirect to Walrus aggregator
 	cors := middleware.CORS()
 	mux.Handle("GET /stream/{id}", cors(handler.NewStream(videos)))
+	mux.Handle("GET /stream/{id}/full", cors(handler.NewStreamFull(videos)))
 
 	// Frontend (embedded static files)
 	webSub, err := fs.Sub(webFS, "web")

@@ -8,66 +8,46 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/anthropics/orca/internal/config"
 	"github.com/anthropics/orca/internal/model"
 	"github.com/anthropics/orca/internal/processor"
-	"github.com/anthropics/orca/internal/walrus"
 )
 
+// Storer abstracts Walrus blob storage for testability.
+type Storer interface {
+	Store(data []byte, epochs int) (string, error)
+	BlobURL(blobID string) string
+}
+
 type Upload struct {
-	walrus *walrus.Client
+	walrus Storer
 	videos *model.VideoStore
 	cfg    *config.Config
 }
 
-func NewUpload(w *walrus.Client, videos *model.VideoStore, cfg *config.Config) *Upload {
+func NewUpload(w Storer, videos *model.VideoStore, cfg *config.Config) *Upload {
 	return &Upload{walrus: w, videos: videos, cfg: cfg}
 }
 
 func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, h.cfg.MaxFileSize)
 
-	file, header, err := r.FormFile("video")
+	data, title, price, creator, err := h.parseRequest(r)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": "failed to read video file: " + err.Error(),
-		})
-		return
-	}
-	defer file.Close()
-
-	if err := processor.ValidateSize(header.Size, h.cfg.MaxFileSize); err != nil {
-		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{
-			"error": err.Error(),
-		})
-		return
-	}
-
-	data, err := io.ReadAll(file)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": "failed to read video file",
-		})
-		return
-	}
-
-	if err := processor.ValidateMagicBytes(bytes.NewReader(data)); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": "invalid file format: only MP4 files are accepted",
-		})
+		writeJSON(w, err.status, map[string]string{"error": err.msg})
 		return
 	}
 
 	id := generateID()
-	title := r.FormValue("title")
 	if title == "" {
 		title = id
 	}
 
-	h.videos.Create(id, title)
+	h.videos.Create(id, title, price, creator)
 
-	go h.uploadToWalrus(id, data)
+	go h.processAndUpload(id, data)
 
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"id":     id,
@@ -75,17 +55,99 @@ func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Upload) uploadToWalrus(id string, data []byte) {
-	blobID, err := h.walrus.Store(data, h.cfg.WalrusEpochs)
+type requestError struct {
+	status int
+	msg    string
+}
+
+func (h *Upload) parseRequest(r *http.Request) ([]byte, string, uint64, string, *requestError) {
+	file, header, err := r.FormFile("video")
+	if err != nil {
+		return nil, "", 0, "", &requestError{http.StatusBadRequest, "failed to read video file: " + err.Error()}
+	}
+	defer file.Close()
+
+	if err := processor.ValidateSize(header.Size, h.cfg.MaxFileSize); err != nil {
+		return nil, "", 0, "", &requestError{http.StatusRequestEntityTooLarge, err.Error()}
+	}
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, "", 0, "", &requestError{http.StatusBadRequest, "failed to read video file"}
+	}
+
+	if err := processor.ValidateMagicBytes(bytes.NewReader(data)); err != nil {
+		return nil, "", 0, "", &requestError{http.StatusBadRequest, "invalid file format: only MP4 files are accepted"}
+	}
+
+	title := r.FormValue("title")
+	creator := r.FormValue("creator")
+
+	var price uint64
+	if v := r.FormValue("price"); v != "" {
+		price, err = strconv.ParseUint(v, 10, 64)
+		if err != nil {
+			return nil, "", 0, "", &requestError{http.StatusBadRequest, "invalid price: must be a positive integer (MIST)"}
+		}
+	}
+
+	return data, title, price, creator, nil
+}
+
+func (h *Upload) processAndUpload(id string, data []byte) {
+	previewData, err := processor.ExtractPreview(data, h.cfg.PreviewDuration, h.cfg.FFmpegPath)
+	if err != nil {
+		slog.Error("preview extraction failed", "id", id, "error", err)
+		h.videos.SetFailed(id, "preview extraction failed: "+err.Error())
+		return
+	}
+
+	previewBlobID, fullBlobID, err := h.uploadBothBlobs(previewData, data)
 	if err != nil {
 		slog.Error("walrus upload failed", "id", id, "error", err)
 		h.videos.SetFailed(id, "upload to Walrus failed: "+err.Error())
 		return
 	}
 
-	blobURL := h.walrus.BlobURL(blobID)
-	h.videos.SetReady(id, blobID, blobURL)
-	slog.Info("video uploaded to walrus", "id", id, "blob_id", blobID)
+	previewBlobURL := h.walrus.BlobURL(previewBlobID)
+	fullBlobURL := h.walrus.BlobURL(fullBlobID)
+	h.videos.SetReady(id, previewBlobID, previewBlobURL, fullBlobID, fullBlobURL)
+	slog.Info("video uploaded to walrus",
+		"id", id,
+		"preview_blob_id", previewBlobID,
+		"full_blob_id", fullBlobID,
+	)
+}
+
+// uploadBothBlobs uploads preview and full data to Walrus in parallel.
+func (h *Upload) uploadBothBlobs(preview, full []byte) (string, string, error) {
+	type result struct {
+		blobID string
+		err    error
+	}
+
+	previewCh := make(chan result, 1)
+	fullCh := make(chan result, 1)
+
+	go func() {
+		blobID, err := h.walrus.Store(preview, h.cfg.WalrusEpochs)
+		previewCh <- result{blobID, err}
+	}()
+	go func() {
+		blobID, err := h.walrus.Store(full, h.cfg.WalrusEpochs)
+		fullCh <- result{blobID, err}
+	}()
+
+	pr := <-previewCh
+	fr := <-fullCh
+
+	if pr.err != nil {
+		return "", "", pr.err
+	}
+	if fr.err != nil {
+		return "", "", fr.err
+	}
+	return pr.blobID, fr.blobID, nil
 }
 
 func generateID() string {
