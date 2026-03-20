@@ -50,3 +50,48 @@ func TestCheckFFmpeg_Invalid(t *testing.T) {
 		t.Fatal("expected error for nonexistent ffmpeg path")
 	}
 }
+
+func TestEnsureFaststart_ValidMP4(t *testing.T) {
+	data, err := os.ReadFile("../../test.mp4")
+	if err != nil {
+		t.Fatalf("failed to read test.mp4: %v", err)
+	}
+
+	output, err := EnsureFaststart(data, "ffmpeg")
+	if err != nil {
+		t.Fatalf("EnsureFaststart failed: %v", err)
+	}
+
+	if len(output) == 0 {
+		t.Fatal("expected non-empty output")
+	}
+
+	if err := ValidateMagicBytes(bytes.NewReader(output)); err != nil {
+		t.Errorf("output is not valid MP4: %v", err)
+	}
+}
+
+func TestEnsureFaststart_HasMoovFirst(t *testing.T) {
+	data, err := os.ReadFile("../../test.mp4")
+	if err != nil {
+		t.Fatalf("failed to read test.mp4: %v", err)
+	}
+
+	output, err := EnsureFaststart(data, "ffmpeg")
+	if err != nil {
+		t.Fatalf("EnsureFaststart failed: %v", err)
+	}
+
+	if !HasMoovFirst(output) {
+		t.Error("expected moov atom to be first after faststart")
+	}
+}
+
+func TestEnsureFaststart_InvalidInput(t *testing.T) {
+	garbage := []byte("this is not an mp4 file at all")
+
+	_, err := EnsureFaststart(garbage, "ffmpeg")
+	if err == nil {
+		t.Fatal("expected error for invalid input")
+	}
+}

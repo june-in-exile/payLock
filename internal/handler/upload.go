@@ -102,7 +102,13 @@ func (h *Upload) processAndUpload(id string, data []byte) {
 		return
 	}
 
-	previewBlobID, fullBlobID, err := h.uploadBothBlobs(previewData, data)
+	fastData, err := processor.EnsureFaststart(data, h.cfg.FFmpegPath)
+	if err != nil {
+		slog.Warn("faststart failed, uploading original", "id", id, "error", err)
+		fastData = data
+	}
+
+	previewBlobID, fullBlobID, err := h.uploadBothBlobs(previewData, fastData)
 	if err != nil {
 		slog.Error("walrus upload failed", "id", id, "error", err)
 		h.videos.SetFailed(id, "upload to Walrus failed: "+err.Error())

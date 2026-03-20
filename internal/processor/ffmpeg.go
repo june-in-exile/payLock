@@ -28,7 +28,7 @@ func ExtractPreview(data []byte, durationSec int, ffmpegPath string) ([]byte, er
 	}
 	defer removeTempFile(inputFile)
 
-	outputFile, err := createTempOutputPath()
+	outputFile, err := createTempOutputPath("orca-preview-*.mp4")
 	if err != nil {
 		return nil, err
 	}
@@ -60,8 +60,8 @@ func writeTempInput(data []byte) (string, error) {
 	return path, nil
 }
 
-func createTempOutputPath() (string, error) {
-	f, err := os.CreateTemp("", "orca-preview-*.mp4")
+func createTempOutputPath(prefix string) (string, error) {
+	f, err := os.CreateTemp("", prefix)
 	if err != nil {
 		return "", fmt.Errorf("create temp output file: %w", err)
 	}
@@ -70,16 +70,13 @@ func createTempOutputPath() (string, error) {
 	return path, nil
 }
 
-func runFFmpeg(ffmpegPath, input, output string, durationSec int) error {
-	cmd := exec.Command(ffmpegPath,
-		"-i", input,
-		"-t", strconv.Itoa(durationSec),
-		"-c", "copy",
-		"-movflags", "+faststart",
-		"-y",
-		output,
-	)
+func runFFmpegCmd(ffmpegPath, input, output string, extraArgs ...string) error {
+	args := make([]string, 0, 6+len(extraArgs))
+	args = append(args, "-i", input)
+	args = append(args, extraArgs...)
+	args = append(args, "-y", output)
 
+	cmd := exec.Command(ffmpegPath, args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
@@ -87,6 +84,15 @@ func runFFmpeg(ffmpegPath, input, output string, durationSec int) error {
 		return fmt.Errorf("ffmpeg failed: %w: %s", err, stderr.String())
 	}
 	return nil
+}
+
+func runFFmpeg(ffmpegPath, input, output string, durationSec int) error {
+	return runFFmpegCmd(
+		ffmpegPath, input, output,
+		"-t", strconv.Itoa(durationSec),
+		"-c", "copy",
+		"-movflags", "+faststart",
+	)
 }
 
 func readAndValidateOutput(path string) ([]byte, error) {
@@ -108,4 +114,24 @@ func removeTempFile(path string) {
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		slog.Warn("failed to remove temp file", "path", path, "error", err)
 	}
+}
+
+func EnsureFaststart(data []byte, ffmpegPath string) ([]byte, error) {
+	inputFile, err := writeTempInput(data)
+	if err != nil {
+		return nil, err
+	}
+	defer removeTempFile(inputFile)
+
+	outputFile, err := createTempOutputPath("orca-faststart-*.mp4")
+	if err != nil {
+		return nil, err
+	}
+	defer removeTempFile(outputFile)
+
+	if err := runFFmpegCmd(ffmpegPath, inputFile, outputFile, "-c", "copy", "-movflags", "+faststart"); err != nil {
+		return nil, err
+	}
+
+	return readAndValidateOutput(outputFile)
 }

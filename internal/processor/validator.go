@@ -1,6 +1,7 @@
 package processor
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,6 +34,15 @@ func ValidateSize(size int64, maxSize int64) error {
 		return fmt.Errorf("%w: %d bytes (max %d)", ErrFileTooLarge, size, maxSize)
 	}
 	return nil
+}
+
+func HasMoovFirst(data []byte) bool {
+	if len(data) < 8 {
+		return false
+	}
+	moovIdx := bytes.Index(data, []byte("moov"))
+	mdatIdx := bytes.Index(data, []byte("mdat"))
+	return moovIdx > 0 && moovIdx < mdatIdx
 }
 
 type probeResult struct {
