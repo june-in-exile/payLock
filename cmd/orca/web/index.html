@@ -603,14 +603,17 @@
 
     async function initWallet() {
       try {
+        // Use consistent esm.sh imports — seal and sui share deps via ?deps param
+        const suiVer = '1.45.2';
+        const sealVer = '0.10.0';
         const [slushMod, walletMod, suiMod, txMod, walletStdMod, sealMod, utilsMod, configResult] = await Promise.all([
           import('https://esm.sh/@mysten/slush-wallet@1.0.3?bundle'),
           import('https://esm.sh/@wallet-standard/app@1.1.0?bundle'),
-          import('https://esm.sh/@mysten/sui@1.21.1/client?bundle'),
-          import('https://esm.sh/@mysten/sui@1.21.1/transactions?bundle'),
+          import(`https://esm.sh/@mysten/sui@${suiVer}/client`),
+          import(`https://esm.sh/@mysten/sui@${suiVer}/transactions`),
           import('https://esm.sh/@mysten/wallet-standard@0.20.1?bundle'),
-          import('https://esm.sh/@mysten/seal@1.1.1?bundle'),
-          import('https://esm.sh/@mysten/sui@1.21.1/utils?bundle'),
+          import(`https://esm.sh/@mysten/seal@${sealVer}?deps=@mysten/sui@${suiVer}`),
+          import(`https://esm.sh/@mysten/sui@${suiVer}/utils`),
           fetchAppConfig(),
         ]);
 
