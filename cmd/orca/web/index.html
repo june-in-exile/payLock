@@ -235,6 +235,62 @@
       color: #ffffff;
     }
 
+    /* Staged file preview */
+    .staged-file {
+      display: none;
+      padding: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 1rem;
+    }
+
+    .staged-file.active {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .staged-file-preview {
+      width: 160px;
+      aspect-ratio: 16/9;
+      background: #000;
+      border-radius: 6px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .staged-file-preview video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .staged-file-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .staged-file-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 0.25rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .staged-file-size {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .staged-file-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
     .video-actions {
       display: flex;
       gap: 0.5rem;
@@ -434,7 +490,7 @@
   </header>
 
   <div class="upload-overlay" id="upload-overlay">
-    <div class="upload-overlay-text">Drop MP4 to upload</div>
+    <div class="upload-overlay-text">Drop MP4 to select</div>
   </div>
 
   <main>
@@ -453,11 +509,24 @@
         <label for="video-price" style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Price in SUI (0 = free)</label>
         <input type="number" id="video-price" placeholder="0" min="0" step="0.01" style="width: 100%; padding: 0.6rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem; margin-bottom: 1rem;">
 
+        <div class="staged-file" id="staged-file">
+          <div class="staged-file-preview">
+            <video id="staged-preview" muted></video>
+          </div>
+          <div class="staged-file-info">
+            <div class="staged-file-name" id="staged-file-name"></div>
+            <div class="staged-file-size" id="staged-file-size"></div>
+            <div class="staged-file-actions">
+              <button class="btn btn-outline" onclick="document.getElementById('upload-file').click()">Change File</button>
+              <button class="btn btn-outline" onclick="cancelStaged()">Remove</button>
+            </div>
+          </div>
+        </div>
+
         <div style="display:flex; align-items:center; justify-content:space-between;">
           <h2 style="margin-bottom:0;">Videos</h2>
           <div style="display:flex; gap:0.75rem; align-items:center;">
-            <button class="refresh-btn" onclick="loadVideos()">Refresh</button>
-            <button class="btn" onclick="document.getElementById('upload-file').click()" title="Upload Video">Upload MP4</button>
+            <button class="btn" id="upload-action-btn" onclick="handleUploadAction()">Select MP4</button>
             <input type="file" id="upload-file" accept="video/mp4,.mp4" style="display:none;">
           </div>
         </div>
@@ -540,7 +609,7 @@
           import('https://esm.sh/@mysten/sui@1.21.1/client?bundle'),
           import('https://esm.sh/@mysten/sui@1.21.1/transactions?bundle'),
           import('https://esm.sh/@mysten/wallet-standard@0.20.1?bundle'),
-          import('https://esm.sh/@mysten/seal@0.4.0?bundle'),
+          import('https://esm.sh/@mysten/seal@1.1.1?bundle'),
           import('https://esm.sh/@mysten/sui@1.21.1/utils?bundle'),
           fetchAppConfig(),
         ]);
@@ -564,8 +633,15 @@
 
         sealClient = new SealClientClass({
           suiClient,
-          serverObjectIds: [
-            '0xb012378c9f3799fb5b1a7083da74a4069e3c3f1c93de0b27212a5799ce1e1e98',
+          serverConfigs: [
+            {
+              objectId: '0x73d05d62c18d9374e3ea529e8e0ed6161da1a141a94d3f76ae3fe4e99356db75',
+              weight: 1,
+            },
+            {
+              objectId: '0xf5d14a81a982144ae441cd7d64b09027f116a468bd36e7eca494f750591623c8',
+              weight: 1,
+            },
           ],
           verifyKeyServers: false,
         });
@@ -623,6 +699,8 @@
           connectedWallet = slush;
           connectedAccount = result.accounts[0];
           await updateWalletUI();
+          // Re-check AccessPass for current video after auto-reconnect
+          if (typeof recheckAccessAfterConnect === 'function') recheckAccessAfterConnect();
         }
       } catch (_) {
         sessionStorage.removeItem('orca_wallet_addr');
@@ -650,6 +728,8 @@
           connectedAccount = result.accounts[0];
           sessionStorage.setItem('orca_wallet_addr', connectedAccount.address);
           await updateWalletUI();
+          // Re-check AccessPass for current video after wallet connects
+          if (typeof recheckAccessAfterConnect === 'function') recheckAccessAfterConnect();
         }
       } catch (err) {
         const btn = document.getElementById('wallet-btn');
@@ -902,8 +982,13 @@
 
       // 3. Fetch encrypted blob from Walrus
       const encryptedRes = await fetch(video.full_blob_url);
-      if (!encryptedRes.ok) throw new Error('Failed to fetch encrypted blob');
+      if (!encryptedRes.ok) throw new Error('Failed to fetch encrypted blob (HTTP ' + encryptedRes.status + ')');
       const encryptedData = new Uint8Array(await encryptedRes.arrayBuffer());
+      // Guard: Walrus may return JSON error with HTTP 200 — first byte 0x7B = '{'
+      if (encryptedData.length > 0 && encryptedData[0] === 0x7B) {
+        const text = new TextDecoder().decode(encryptedData);
+        throw new Error('Walrus returned an error instead of encrypted data: ' + text.slice(0, 200));
+      }
 
       // 4. Parse encrypted object to get the seal ID
       const parsedEncrypted = EncryptedObjectClass.parse(encryptedData);
@@ -1096,7 +1181,7 @@
         const videos = data.videos || [];
 
         if (videos.length === 0) {
-          setEmptyState(container, 'No videos yet. Drag and drop a file or click Upload MP4.');
+          setEmptyState(container, 'No videos yet. Drag and drop a file or click Select MP4.');
           return;
         }
 
@@ -1132,25 +1217,87 @@
       e.preventDefault();
       uploadOverlay.classList.remove('active');
       if (e.dataTransfer.files.length > 0) {
-        handleFile(e.dataTransfer.files[0]);
+        stageFile(e.dataTransfer.files[0]);
       }
     });
 
     uploadFile.addEventListener('change', () => {
       if (uploadFile.files.length > 0) {
-        handleFile(uploadFile.files[0]);
+        stageFile(uploadFile.files[0]);
       }
     });
 
     // Pending encryption state for paid video uploads
     let pendingEncryption = null;
 
-    async function handleFile(file) {
+    // Staged file waiting for user confirmation
+    let stagedFile = null;
+    const stagedFileEl = document.getElementById('staged-file');
+    const stagedPreview = document.getElementById('staged-preview');
+    const stagedFileName = document.getElementById('staged-file-name');
+    const stagedFileSize = document.getElementById('staged-file-size');
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function stageFile(file) {
       if (!file.name.toLowerCase().endsWith('.mp4')) {
         showResult('error', 'Only MP4 files are accepted.');
         return;
       }
 
+      // Revoke previous preview URL if any
+      if (stagedPreview.src) {
+        URL.revokeObjectURL(stagedPreview.src);
+      }
+
+      stagedFile = file;
+      stagedFileName.textContent = file.name;
+      stagedFileSize.textContent = formatFileSize(file.size);
+      stagedPreview.src = URL.createObjectURL(file);
+      stagedFileEl.classList.add('active');
+      uploadResult.style.display = 'none';
+      updateUploadButton();
+    }
+
+    const uploadActionBtn = document.getElementById('upload-action-btn');
+
+    function updateUploadButton() {
+      if (stagedFile) {
+        uploadActionBtn.textContent = 'Confirm Upload';
+      } else {
+        uploadActionBtn.textContent = 'Select MP4';
+      }
+    }
+
+    window.handleUploadAction = function() {
+      if (stagedFile) {
+        window.confirmUpload();
+      } else {
+        document.getElementById('upload-file').click();
+      }
+    };
+
+    window.cancelStaged = function() {
+      stagedFile = null;
+      stagedFileEl.classList.remove('active');
+      if (stagedPreview.src) {
+        URL.revokeObjectURL(stagedPreview.src);
+        stagedPreview.removeAttribute('src');
+      }
+      uploadFile.value = '';
+      updateUploadButton();
+    };
+
+    window.confirmUpload = async function() {
+      if (!stagedFile) return;
+      const file = stagedFile;
+
+      // Hide staged preview, show progress
+      stagedFileEl.classList.remove('active');
       uploadResult.className = 'upload-result';
       uploadResult.style.display = 'none';
       uploadProgress.style.display = '';
@@ -1221,8 +1368,16 @@
         showResult('error', 'Network error. Is the server running?');
       });
 
+      // Clean up staged state
+      stagedFile = null;
+      if (stagedPreview.src) {
+        URL.revokeObjectURL(stagedPreview.src);
+        stagedPreview.removeAttribute('src');
+      }
+      updateUploadButton();
+
       xhr.send(formData);
-    }
+    };
 
     function showResult(type, message) {
       uploadResult.className = 'upload-result ' + type;
@@ -1232,6 +1387,32 @@
 
     // Player
     let currentVideo = null;
+
+    // Called by wallet module after connect/reconnect — auto-decrypt if AccessPass exists
+    function recheckAccessAfterConnect() {
+      if (!currentVideo || currentView !== 'player') return;
+      if (currentVideo.price <= 0 || !currentVideo.encrypted || !currentVideo.sui_object_id) return;
+      if (!window.isWalletConnected()) return;
+
+      const videoEl = document.getElementById('video-player');
+      // Skip if already playing the decrypted full video
+      if (videoEl && videoEl.src && videoEl.src.startsWith('blob:')) return;
+
+      const urlEl = document.getElementById('stream-url');
+      const paywallEl = document.getElementById('paywall-overlay');
+      const hintEl = document.getElementById('paywall-hint');
+
+      window.findAccessPass(currentVideo.sui_object_id).then(function(passId) {
+        if (!passId) return;
+        if (urlEl) urlEl.textContent = 'Decrypting full video...';
+        if (paywallEl) paywallEl.style.display = 'none';
+        return window.decryptAndPlay(currentVideo);
+      }).then(function() {
+        updateChainStatus(currentVideo);
+      }).catch(function(err) {
+        if (hintEl) hintEl.textContent = 'Decryption failed: ' + err.message;
+      });
+    }
 
     function loadPlayer(id) {
       const videoEl = document.getElementById('video-player');
@@ -1337,8 +1518,10 @@
             updateChainStatus(video);
             return;
           }
-        } catch (_) {
-          // Fall through to preview playback
+        } catch (err) {
+          // Show error but fall through to preview playback
+          const hintEl = document.getElementById('paywall-hint');
+          if (hintEl) hintEl.textContent = 'Auto-decrypt failed: ' + err.message;
         }
       }
 
@@ -1397,11 +1580,18 @@
       }
 
       btn.disabled = true;
-      btn.textContent = 'Purchasing...';
       if (hintEl) hintEl.textContent = '';
 
       try {
-        await window.purchaseVideo(currentVideo);
+        // Check if user already owns an AccessPass (e.g. purchased before refresh)
+        btn.textContent = 'Checking access...';
+        const existingPass = await window.findAccessPass(currentVideo.sui_object_id);
+
+        if (!existingPass) {
+          btn.textContent = 'Purchasing...';
+          await window.purchaseVideo(currentVideo);
+        }
+
         btn.textContent = 'Decrypting...';
         await window.decryptAndPlay(currentVideo);
       } catch (err) {
