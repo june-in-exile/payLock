@@ -54,11 +54,17 @@ func TestVideoStore_SetReady(t *testing.T) {
 	store := newTestStore(t)
 	store.Create("test-1", "My Video", 0, "")
 
-	store.SetReady("test-1", "previewBlob", "https://agg/v1/blobs/previewBlob", "fullBlob", "https://agg/v1/blobs/fullBlob")
+	store.SetReady("test-1", "thumbBlob", "https://agg/v1/blobs/thumbBlob", "previewBlob", "https://agg/v1/blobs/previewBlob", "fullBlob", "https://agg/v1/blobs/fullBlob")
 
 	v, _ := store.Get("test-1")
 	if v.Status != StatusReady {
 		t.Errorf("expected status ready, got %s", v.Status)
+	}
+	if v.ThumbnailBlobID != "thumbBlob" {
+		t.Errorf("expected thumbnail_blob_id thumbBlob, got %s", v.ThumbnailBlobID)
+	}
+	if v.ThumbnailBlobURL != "https://agg/v1/blobs/thumbBlob" {
+		t.Errorf("expected thumbnail_blob_url, got %s", v.ThumbnailBlobURL)
 	}
 	if v.PreviewBlobID != "previewBlob" {
 		t.Errorf("expected preview_blob_id previewBlob, got %s", v.PreviewBlobID)
@@ -163,7 +169,7 @@ func TestVideoStore_Persistence(t *testing.T) {
 		t.Fatal(err)
 	}
 	store1.Create("v1", "Video One", 0, "")
-	store1.SetReady("v1", "pBlob", "pURL", "fBlob", "fURL")
+	store1.SetReady("v1", "tBlob", "tURL", "pBlob", "pURL", "fBlob", "fURL")
 	store1.Create("v2", "Video Two", 500, "0xABC")
 
 	// Load a new store from the same directory — should recover data

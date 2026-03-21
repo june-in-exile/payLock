@@ -107,8 +107,15 @@ func (h *Upload) processAndUpload(id string, data []byte) {
 		return
 	}
 
-	// Paid videos: upload only preview; full blob is encrypted + uploaded by the frontend
+	thumbnailData, err := processor.ExtractThumbnail(data, h.cfg.FFmpegPath)
+	if err != nil {
+		slog.Warn("thumbnail extraction failed, continuing without thumbnail", "id", id, "error", err)
+	}
+
+	// Paid videos: upload only preview + thumbnail; full blob is encrypted + uploaded by the frontend
 	if video.Price > 0 {
+		thumbBlobID, thumbBlobURL := h.uploadThumbnail(id, thumbnailData)
+
 		previewBlobID, err := h.walrus.Store(previewData, h.cfg.WalrusEpochs)
 		if err != nil {
 			slog.Error("walrus upload failed", "id", id, "error", err)
@@ -116,7 +123,7 @@ func (h *Upload) processAndUpload(id string, data []byte) {
 			return
 		}
 		previewBlobURL := h.walrus.BlobURL(previewBlobID)
-		h.videos.SetReady(id, previewBlobID, previewBlobURL, "", "")
+		h.videos.SetReady(id, thumbBlobID, thumbBlobURL, previewBlobID, previewBlobURL, "", "")
 		slog.Info("preview uploaded to walrus (paid video, awaiting encrypted full blob)",
 			"id", id,
 			"preview_blob_id", previewBlobID,
@@ -124,7 +131,9 @@ func (h *Upload) processAndUpload(id string, data []byte) {
 		return
 	}
 
-	// Free videos: upload both blobs as before
+	// Free videos: upload thumbnail, preview, and full blobs
+	thumbBlobID, thumbBlobURL := h.uploadThumbnail(id, thumbnailData)
+
 	fastData, err := processor.EnsureFaststart(data, h.cfg.FFmpegPath)
 	if err != nil {
 		slog.Warn("faststart failed, uploading original", "id", id, "error", err)
@@ -140,12 +149,25 @@ func (h *Upload) processAndUpload(id string, data []byte) {
 
 	previewBlobURL := h.walrus.BlobURL(previewBlobID)
 	fullBlobURL := h.walrus.BlobURL(fullBlobID)
-	h.videos.SetReady(id, previewBlobID, previewBlobURL, fullBlobID, fullBlobURL)
+	h.videos.SetReady(id, thumbBlobID, thumbBlobURL, previewBlobID, previewBlobURL, fullBlobID, fullBlobURL)
 	slog.Info("video uploaded to walrus",
 		"id", id,
 		"preview_blob_id", previewBlobID,
 		"full_blob_id", fullBlobID,
 	)
+}
+
+// uploadThumbnail uploads thumbnail data to Walrus. Returns empty strings if thumbnail is nil.
+func (h *Upload) uploadThumbnail(id string, thumbnailData []byte) (string, string) {
+	if len(thumbnailData) == 0 {
+		return "", ""
+	}
+	blobID, err := h.walrus.Store(thumbnailData, h.cfg.WalrusEpochs)
+	if err != nil {
+		slog.Warn("thumbnail upload failed", "id", id, "error", err)
+		return "", ""
+	}
+	return blobID, h.walrus.BlobURL(blobID)
 }
 
 // uploadBothBlobs uploads preview and full data to Walrus in parallel.

@@ -87,6 +87,36 @@ func TestEnsureFaststart_HasMoovFirst(t *testing.T) {
 	}
 }
 
+func TestExtractThumbnail_ValidMP4(t *testing.T) {
+	data, err := os.ReadFile("../../test.mp4")
+	if err != nil {
+		t.Fatalf("failed to read test.mp4: %v", err)
+	}
+
+	thumb, err := ExtractThumbnail(data, "ffmpeg")
+	if err != nil {
+		t.Fatalf("ExtractThumbnail failed: %v", err)
+	}
+
+	if len(thumb) == 0 {
+		t.Fatal("expected non-empty thumbnail output")
+	}
+
+	// JPEG files start with FF D8
+	if len(thumb) < 2 || thumb[0] != 0xFF || thumb[1] != 0xD8 {
+		t.Error("expected JPEG output (FF D8 header)")
+	}
+}
+
+func TestExtractThumbnail_InvalidInput(t *testing.T) {
+	garbage := []byte("this is not an mp4 file at all")
+
+	_, err := ExtractThumbnail(garbage, "ffmpeg")
+	if err == nil {
+		t.Fatal("expected error for invalid input")
+	}
+}
+
 func TestEnsureFaststart_InvalidInput(t *testing.T) {
 	garbage := []byte("this is not an mp4 file at all")
 

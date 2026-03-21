@@ -135,6 +135,23 @@
       transition: border-color 0.2s;
       border: 1px solid transparent;
       box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+      position: relative;
+    }
+
+    .play-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      color: rgba(255,255,255,0.8);
+      background: rgba(0,0,0,0.3);
+      transition: background 0.2s;
+    }
+
+    .video-thumb:hover .play-overlay {
+      background: rgba(0,0,0,0.5);
     }
 
     .video-info {
@@ -1081,9 +1098,23 @@
 
       const thumb = document.createElement('div');
       thumb.className = 'video-thumb';
-      thumb.textContent = v.status === 'ready' ? '\u25B6' : '\u2026';
       thumb.addEventListener('click', () => navigate('player', { id: v.id }));
       thumb.style.cursor = 'pointer';
+
+      if (v.thumbnail_blob_url && v.status === 'ready') {
+        const img = document.createElement('img');
+        img.src = v.thumbnail_blob_url;
+        img.alt = v.title || v.id;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+        thumb.appendChild(img);
+        const playOverlay = document.createElement('div');
+        playOverlay.className = 'play-overlay';
+        playOverlay.textContent = '\u25B6';
+        thumb.appendChild(playOverlay);
+      } else {
+        thumb.textContent = v.status === 'ready' ? '\u25B6' : '\u2026';
+      }
+
       card.appendChild(thumb);
 
       const info = document.createElement('div');

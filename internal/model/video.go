@@ -24,10 +24,12 @@ type Video struct {
 	CreatedAt      string `json:"created_at"`
 	Price          uint64 `json:"price"`
 	Creator        string `json:"creator,omitempty"`
-	PreviewBlobID  string `json:"preview_blob_id,omitempty"`
-	PreviewBlobURL string `json:"preview_blob_url,omitempty"`
-	FullBlobID     string `json:"full_blob_id,omitempty"`
-	FullBlobURL    string `json:"full_blob_url,omitempty"`
+	ThumbnailBlobID  string `json:"thumbnail_blob_id,omitempty"`
+	ThumbnailBlobURL string `json:"thumbnail_blob_url,omitempty"`
+	PreviewBlobID    string `json:"preview_blob_id,omitempty"`
+	PreviewBlobURL   string `json:"preview_blob_url,omitempty"`
+	FullBlobID       string `json:"full_blob_id,omitempty"`
+	FullBlobURL      string `json:"full_blob_url,omitempty"`
 	Encrypted      bool   `json:"encrypted"`
 	SuiObjectID    string `json:"sui_object_id,omitempty"`
 	Error          string `json:"error,omitempty"`
@@ -85,10 +87,12 @@ func (s *VideoStore) Get(id string) (*Video, bool) {
 	return &copied, true
 }
 
-func (s *VideoStore) SetReady(id, previewBlobID, previewBlobURL, fullBlobID, fullBlobURL string) {
+func (s *VideoStore) SetReady(id, thumbnailBlobID, thumbnailBlobURL, previewBlobID, previewBlobURL, fullBlobID, fullBlobURL string) {
 	s.mu.Lock()
 	if v, ok := s.videos[id]; ok {
 		v.Status = StatusReady
+		v.ThumbnailBlobID = thumbnailBlobID
+		v.ThumbnailBlobURL = thumbnailBlobURL
 		v.PreviewBlobID = previewBlobID
 		v.PreviewBlobURL = previewBlobURL
 		v.FullBlobID = fullBlobID

@@ -116,6 +116,38 @@ func removeTempFile(path string) {
 	}
 }
 
+// ExtractThumbnail extracts the first frame from MP4 data as a JPEG image.
+// Returns the JPEG bytes. The input data is not mutated.
+func ExtractThumbnail(data []byte, ffmpegPath string) ([]byte, error) {
+	inputFile, err := writeTempInput(data)
+	if err != nil {
+		return nil, err
+	}
+	defer removeTempFile(inputFile)
+
+	outputFile, err := createTempOutputPath("paylock-thumb-*.jpg")
+	if err != nil {
+		return nil, err
+	}
+	defer removeTempFile(outputFile)
+
+	if err := runFFmpegCmd(ffmpegPath, inputFile, outputFile,
+		"-vframes", "1",
+		"-q:v", "2",
+	); err != nil {
+		return nil, fmt.Errorf("thumbnail extraction failed: %w", err)
+	}
+
+	thumbData, err := os.ReadFile(outputFile)
+	if err != nil {
+		return nil, fmt.Errorf("read thumbnail output: %w", err)
+	}
+	if len(thumbData) == 0 {
+		return nil, fmt.Errorf("ffmpeg produced empty thumbnail")
+	}
+	return thumbData, nil
+}
+
 func EnsureFaststart(data []byte, ffmpegPath string) ([]byte, error) {
 	inputFile, err := writeTempInput(data)
 	if err != nil {
