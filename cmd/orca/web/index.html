@@ -964,10 +964,11 @@
       if (hintEl) hintEl.textContent = 'Decrypting video...';
 
       // 1. Create SessionKey
-      const sessionKey = new SessionKeyClass({
+      const sessionKey = await SessionKeyClass.create({
         address: connectedAccount.address,
         packageId: paywallPackageId,
         ttlMin: 10,
+        suiClient,
       });
 
       // 2. Sign personal message via wallet
