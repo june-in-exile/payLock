@@ -10,6 +10,7 @@ module orca::paywall {
     const EInsufficientPayment: u64 = 0;
     const EVideoMismatch: u64 = 1;
     const EInvalidSealId: u64 = 2;
+    const ENotCreator: u64 = 3;
 
     // === Structs ===
 
@@ -24,7 +25,7 @@ module orca::paywall {
     }
 
     /// Proof of purchase, minted after payment. Owned by the buyer.
-    public struct AccessPass has key {
+    public struct AccessPass has key, store {
         id: UID,
         video_id: ID,
     }
@@ -64,6 +65,26 @@ module orca::paywall {
             video_id: object::id(video),
         };
         pass
+    }
+
+    /// Creator updates the full blob ID after Seal encryption + Walrus upload.
+    public fun update_full_blob_id(
+        video: &mut Video,
+        full_blob_id: String,
+        ctx: &TxContext,
+    ) {
+        assert!(tx_context::sender(ctx) == video.creator, ENotCreator);
+        video.full_blob_id = full_blob_id;
+    }
+
+    /// Convenience entry function: purchases and transfers AccessPass to buyer.
+    entry fun purchase_and_transfer(
+        video: &Video,
+        payment: Coin<SUI>,
+        ctx: &mut TxContext,
+    ) {
+        let pass = purchase(video, payment, ctx);
+        transfer::public_transfer(pass, tx_context::sender(ctx));
     }
 
     /// Seal key server calls this to verify decryption rights.
