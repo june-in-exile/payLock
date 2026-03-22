@@ -373,7 +373,7 @@ export async function purchaseVideo(video) {
   if (!connectedWallet || !connectedAccount) throw new Error('Wallet not connected');
   if (!video.sui_object_id) throw new Error('Video not published on-chain');
 
-  const priceInMist = Math.round(video.price * 1_000_000_000);
+  const priceInMist = video.price;
   const tx = new Transaction();
   const [paymentCoin] = tx.splitCoins(tx.gas, [priceInMist]);
   tx.moveCall({
@@ -391,10 +391,20 @@ export async function purchaseVideo(video) {
     chain: SUI_NETWORK,
   });
 
-  await suiClient.waitForTransaction({ digest: result.digest });
+  const txResponse = await suiClient.waitForTransaction({
+    digest: result.digest,
+    options: { showObjectChanges: true },
+  });
+
+  const accessPassType = paywallPackageId + '::paywall::AccessPass';
+  const created = (txResponse.objectChanges || []).find(
+    c => c.type === 'created' && c.objectType === accessPassType
+  );
+
+  return created ? created.objectId : null;
 }
 
-export async function decryptAndPlay(video) {
+export async function decryptAndPlay(video, knownAccessPassId) {
   if (!connectedWallet || !connectedAccount) throw new Error('Wallet not connected');
   if (!sealClient || !SessionKeyClass || !EncryptedObjectClass) throw new Error('Seal SDK not loaded');
 
@@ -431,7 +441,7 @@ export async function decryptAndPlay(video) {
   const parsedEncrypted = EncryptedObjectClass.parse(encryptedData);
   const sealId = parsedEncrypted.id;
 
-  const accessPassId = await findAccessPass(video.sui_object_id);
+  const accessPassId = knownAccessPassId || await findAccessPass(video.sui_object_id);
   if (!accessPassId) throw new Error('No AccessPass found for this video');
 
   const tx = new Transaction();

@@ -46,6 +46,7 @@ func main() {
 	// API routes
 	mux.Handle("POST /api/upload", handler.NewUpload(wc, videos, cfg))
 	mux.Handle("GET /api/status/{id}", handler.NewStatus(videos))
+	mux.Handle("GET /api/status/{id}/events", handler.NewStatusEvents(videos))
 	mux.Handle("GET /api/videos", handler.NewVideos(videos))
 	mux.Handle("DELETE /api/videos/{id}", handler.NewDelete(videos))
 	mux.Handle("PUT /api/videos/{id}/sui-object", handler.NewSetSuiObject(videos))

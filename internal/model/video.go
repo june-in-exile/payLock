@@ -36,14 +36,16 @@ type Video struct {
 }
 
 type VideoStore struct {
-	mu       sync.RWMutex
-	videos   map[string]*Video
-	filePath string
+	mu          sync.RWMutex
+	videos      map[string]*Video
+	filePath    string
+	subscribers map[string][]chan Video
 }
 
 func NewVideoStore(dataDir string) (*VideoStore, error) {
 	s := &VideoStore{
-		videos: make(map[string]*Video),
+		videos:      make(map[string]*Video),
+		subscribers: make(map[string][]chan Video),
 	}
 
 	if dataDir != "" {
@@ -57,6 +59,52 @@ func NewVideoStore(dataDir string) (*VideoStore, error) {
 	}
 
 	return s, nil
+}
+
+// Subscribe returns a channel that receives the video when its status changes
+// to ready or failed. The returned cancel function removes the subscription.
+func (s *VideoStore) Subscribe(id string) (<-chan Video, func()) {
+	ch := make(chan Video, 1)
+	s.mu.Lock()
+	s.subscribers[id] = append(s.subscribers[id], ch)
+	s.mu.Unlock()
+
+	cancelled := false
+	cancel := func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if cancelled {
+			return
+		}
+		cancelled = true
+		subs := s.subscribers[id]
+		for i, sub := range subs {
+			if sub == ch {
+				s.subscribers[id] = append(subs[:i], subs[i+1:]...)
+				break
+			}
+		}
+		if len(s.subscribers[id]) == 0 {
+			delete(s.subscribers, id)
+		}
+	}
+	return ch, cancel
+}
+
+// notify sends the video to all subscribers for the given ID. Must be called with mu held.
+func (s *VideoStore) notify(id string) {
+	v, ok := s.videos[id]
+	if !ok {
+		return
+	}
+	copied := *v
+	for _, ch := range s.subscribers[id] {
+		select {
+		case ch <- copied:
+		default:
+		}
+	}
+	delete(s.subscribers, id)
 }
 
 func (s *VideoStore) Create(id, title string, price uint64, creator string) *Video {
@@ -99,6 +147,7 @@ func (s *VideoStore) SetReady(id, thumbnailBlobID, thumbnailBlobURL, previewBlob
 		v.FullBlobID = fullBlobID
 		v.FullBlobURL = fullBlobURL
 		s.persist()
+		s.notify(id)
 	}
 }
 
@@ -134,6 +183,7 @@ func (s *VideoStore) SetFailed(id string, errMsg string) {
 		v.Status = StatusFailed
 		v.Error = errMsg
 		s.persist()
+		s.notify(id)
 	}
 }
 

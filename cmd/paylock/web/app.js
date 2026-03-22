@@ -37,7 +37,11 @@ function navigate(view, params, push) {
   currentView = view;
 
   if (pollInterval) {
-    clearInterval(pollInterval);
+    if (typeof pollInterval.close === 'function') {
+      pollInterval.close();
+    } else {
+      clearInterval(pollInterval);
+    }
     pollInterval = null;
   }
 
@@ -319,11 +323,35 @@ function sendUpload(formData, file) {
 
 function pollUntilReady(id) {
   return new Promise(function(resolve, reject) {
-    const interval = setInterval(async function() {
+    if (typeof EventSource !== 'undefined') {
+      var es = new EventSource('/api/status/' + encodeURIComponent(id) + '/events');
+      es.onmessage = function(e) {
+        var video = JSON.parse(e.data);
+        if (video.status === 'ready') {
+          es.close();
+          resolve(video);
+        } else if (video.status === 'failed') {
+          es.close();
+          reject(new Error(video.error || 'Upload failed'));
+        }
+      };
+      es.onerror = function() {
+        es.close();
+        pollFallback(id).then(resolve, reject);
+      };
+      return;
+    }
+    pollFallback(id).then(resolve, reject);
+  });
+}
+
+function pollFallback(id) {
+  return new Promise(function(resolve, reject) {
+    var interval = setInterval(async function() {
       try {
-        const res = await fetch('/api/status/' + encodeURIComponent(id));
+        var res = await fetch('/api/status/' + encodeURIComponent(id));
         if (!res.ok) return;
-        const video = await res.json();
+        var video = await res.json();
         if (video.status === 'ready') {
           clearInterval(interval);
           resolve(video);
@@ -335,7 +363,7 @@ function pollUntilReady(id) {
         clearInterval(interval);
         reject(err);
       }
-    }, 2000);
+    }, 1000);
   });
 }
 
@@ -450,6 +478,7 @@ function loadPlayer(id) {
   videoIdEl.textContent = id;
   videoEl.removeAttribute('src');
   paywallEl.style.display = 'none';
+  document.getElementById('player-loading').style.display = 'none';
   currentVideo = null;
 
   checkAndPlay(id, navGeneration);
@@ -570,15 +599,16 @@ async function purchaseAndPlay() {
     const mod = await loadWallet();
 
     btn.textContent = 'Checking access...';
-    const existingPass = await mod.findAccessPass(currentVideo.sui_object_id);
+    let accessPassId = await mod.findAccessPass(currentVideo.sui_object_id);
 
-    if (!existingPass) {
+    if (!accessPassId) {
       btn.textContent = 'Purchasing...';
-      await mod.purchaseVideo(currentVideo);
+      accessPassId = await mod.purchaseVideo(currentVideo);
     }
+    console.log("accessPassId: ", accessPassId);
 
     btn.textContent = 'Decrypting...';
-    await mod.decryptAndPlay(currentVideo);
+    await mod.decryptAndPlay(currentVideo, accessPassId);
   } catch (err) {
     btn.disabled = false;
     btn.textContent = 'Purchase & Unlock';
@@ -612,36 +642,56 @@ async function checkAndPlay(id, generation) {
     if (video.status === 'ready') {
       startPlayback(video);
     } else if (video.status === 'processing') {
-      urlEl.textContent = 'Uploading to Walrus... will auto-play when ready.';
-      pollInterval = setInterval(async function() {
-        if (generation !== navGeneration) {
-          clearInterval(pollInterval);
-          pollInterval = null;
-          return;
-        }
-        const r = await fetch('/api/status/' + encodeURIComponent(id));
-        if (generation !== navGeneration) {
-          clearInterval(pollInterval);
-          pollInterval = null;
-          return;
-        }
-        if (r.ok) {
-          const v = await r.json();
-          titleEl.textContent = v.title || v.id;
-          const ss = ['ready', 'processing', 'failed'].includes(v.status) ? v.status : 'failed';
-          statusEl.textContent = v.status;
-          statusEl.className = 'status-badge ' + ss;
-          if (v.status === 'ready') {
-            clearInterval(pollInterval);
-            pollInterval = null;
-            startPlayback(v);
-          } else if (v.status === 'failed') {
-            clearInterval(pollInterval);
-            pollInterval = null;
-            urlEl.textContent = 'Upload failed: ' + (v.error || 'unknown error');
-          }
-        }
-      }, 2000);
+      var loadingEl = document.getElementById('player-loading');
+      loadingEl.style.display = 'flex';
+      urlEl.textContent = '';
+
+      function onVideoReady(v) {
+        if (generation !== navGeneration) return;
+        loadingEl.style.display = 'none';
+        titleEl.textContent = v.title || v.id;
+        statusEl.textContent = v.status;
+        statusEl.className = 'status-badge ready';
+        startPlayback(v);
+      }
+      function onVideoFailed(v) {
+        if (generation !== navGeneration) return;
+        loadingEl.style.display = 'none';
+        statusEl.textContent = 'failed';
+        statusEl.className = 'status-badge failed';
+        urlEl.textContent = 'Upload failed: ' + (v.error || 'unknown error');
+      }
+
+      if (typeof EventSource !== 'undefined') {
+        var es = new EventSource('/api/status/' + encodeURIComponent(id) + '/events');
+        pollInterval = es;
+        es.onmessage = function(e) {
+          if (generation !== navGeneration) { es.close(); return; }
+          var v = JSON.parse(e.data);
+          if (v.status === 'ready') { es.close(); pollInterval = null; onVideoReady(v); }
+          else if (v.status === 'failed') { es.close(); pollInterval = null; onVideoFailed(v); }
+        };
+        es.onerror = function() {
+          es.close();
+          startPollingFallback();
+        };
+      } else {
+        startPollingFallback();
+      }
+
+      function startPollingFallback() {
+        pollInterval = setInterval(async function() {
+          if (generation !== navGeneration) { clearInterval(pollInterval); pollInterval = null; return; }
+          try {
+            var r = await fetch('/api/status/' + encodeURIComponent(id));
+            if (generation !== navGeneration) { clearInterval(pollInterval); pollInterval = null; return; }
+            if (!r.ok) return;
+            var v = await r.json();
+            if (v.status === 'ready') { clearInterval(pollInterval); pollInterval = null; onVideoReady(v); }
+            else if (v.status === 'failed') { clearInterval(pollInterval); pollInterval = null; onVideoFailed(v); }
+          } catch (err) { clearInterval(pollInterval); pollInterval = null; }
+        }, 1000);
+      }
     } else {
       urlEl.textContent = 'Upload failed: ' + (video.error || 'unknown error');
     }
