@@ -52,13 +52,14 @@ module paylock::paywall {
     /// User pays to unlock a video. Mints an AccessPass on success.
     public fun purchase(
         video: &Video,
-        payment: Coin<SUI>,
+        payment: &mut Coin<SUI>,
         ctx: &mut TxContext,
     ): AccessPass {
-        assert!(coin::value(&payment) >= video.price, EInsufficientPayment);
+        assert!(coin::value(payment) >= video.price, EInsufficientPayment);
 
         // Transfer full payment to creator
-        transfer::public_transfer(payment, video.creator);
+        let paid = coin::split(payment, video.price, ctx);
+        transfer::public_transfer(paid, video.creator);
 
         let pass = AccessPass {
             id: object::new(ctx),
@@ -80,7 +81,7 @@ module paylock::paywall {
     /// Convenience entry function: purchases and transfers AccessPass to buyer.
     entry fun purchase_and_transfer(
         video: &Video,
-        payment: Coin<SUI>,
+        payment: &mut Coin<SUI>,
         ctx: &mut TxContext,
     ) {
         let pass = purchase(video, payment, ctx);

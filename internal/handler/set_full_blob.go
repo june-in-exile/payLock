@@ -59,8 +59,8 @@ func (h *SetFullBlob) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	fullBlobURL := h.walrus.BlobURL(body.FullBlobID)
 	if !h.videos.SetFullBlob(id, body.FullBlobID, fullBlobURL) {
-		writeJSON(w, http.StatusNotFound, map[string]string{
-			"error": "video not found",
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "fail to upload full blob id",
 		})
 		return
 	}
