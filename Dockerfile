@@ -1,5 +1,5 @@
 # 第一階段：編譯
-FROM golang:1.25-bullseye AS builder
+FROM golang:1.25-bookworm AS builder
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ COPY . .
 RUN go build -o paylock ./cmd/paylock
 
 # 第二階段：執行環境
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 # 安裝 ffmpeg 與必要套件
 RUN apt-get update && apt-get install -y \
