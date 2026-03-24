@@ -18,7 +18,7 @@ let connectedAccounts = []; // [{ address, balance, wallet, account }]
 let activeAccountIndex = -1;
 let Transaction = null;
 let signAndExecuteTransaction = null;
-let paywallPackageId = null;
+let gatingPackageId = null;
 let sealClient = null;
 let SealClientClass = null;
 let SessionKeyClass = null;
@@ -38,7 +38,7 @@ async function fetchAppConfig() {
     const res = await fetch('/api/config');
     if (res.ok) {
       const cfg = await res.json();
-      paywallPackageId = cfg.paywall_package_id || null;
+      gatingPackageId = cfg.gating_package_id || null;
       return cfg;
     }
   } catch (_) {
@@ -279,13 +279,13 @@ export async function disconnectWallet() {
 
 export async function createVideoOnChain(videoId, price, previewBlobId, fullBlobId, sealNamespace) {
   if (!connectedWallet || !connectedAccount) throw new Error('Wallet not connected');
-  if (!paywallPackageId) throw new Error('Paywall contract not configured');
+  if (!gatingPackageId) throw new Error('Gating contract not configured');
   if (!Transaction || !signAndExecuteTransaction) throw new Error('Sui SDK not loaded');
-  if (!/^0x[0-9a-fA-F]{64}$/.test(paywallPackageId)) throw new Error('Invalid paywall package ID format');
+  if (!/^0x[0-9a-fA-F]{64}$/.test(gatingPackageId)) throw new Error('Invalid gating package ID format');
 
   const tx = new Transaction();
   tx.moveCall({
-    target: paywallPackageId + '::gating::create_video',
+    target: gatingPackageId + '::gating::create_video',
     arguments: [
       tx.pure.u64(price),
       tx.pure.string(previewBlobId),
@@ -305,7 +305,7 @@ export async function createVideoOnChain(videoId, price, previewBlobId, fullBlob
     options: { showObjectChanges: true },
   });
 
-  const videoType = paywallPackageId + '::gating::Video';
+  const videoType = gatingPackageId + '::gating::Video';
   const created = (txResponse.objectChanges || []).find(
     (c) => c.type === 'created' && c.objectType === videoType,
   );
@@ -338,7 +338,7 @@ export async function encryptAndPublish(fileData, onProgress) {
   if (onProgress) onProgress('encrypt');
   const { encryptedObject: encryptedBytes } = await sealClient.encrypt({
     threshold: 1,
-    packageId: paywallPackageId,
+    packageId: gatingPackageId,
     id,
     data: new Uint8Array(fileData),
   });
@@ -376,7 +376,7 @@ function cacheAccessPass(videoSuiObjectId, accessPassId) {
 }
 
 export async function findAccessPass(videoSuiObjectId) {
-  if (!connectedAccount || !paywallPackageId) return null;
+  if (!connectedAccount || !gatingPackageId) return null;
 
   // Check localStorage cache first
   const cached = getCachedAccessPass(videoSuiObjectId);
@@ -393,7 +393,7 @@ export async function findAccessPass(videoSuiObjectId) {
     if (key) localStorage.removeItem(key);
   }
 
-  const accessPassType = paywallPackageId + '::gating::AccessPass';
+  const accessPassType = gatingPackageId + '::gating::AccessPass';
   let cursor = null;
   let hasNext = true;
   while (hasNext) {
@@ -425,7 +425,7 @@ export async function purchaseVideo(video) {
   const tx = new Transaction();
   const [paymentCoin] = tx.splitCoins(tx.gas, [priceInMist]);
   tx.moveCall({
-    target: paywallPackageId + '::gating::purchase_and_transfer',
+    target: gatingPackageId + '::gating::purchase_and_transfer',
     arguments: [tx.object(video.sui_object_id), paymentCoin],
   });
   const result = await signAndExecuteTransaction(connectedWallet, {
@@ -439,7 +439,7 @@ export async function purchaseVideo(video) {
     options: { showObjectChanges: true },
   });
 
-  const accessPassType = paywallPackageId + '::gating::AccessPass';
+  const accessPassType = gatingPackageId + '::gating::AccessPass';
   const created = (txResponse.objectChanges || []).find(
     (c) => c.type === 'created' && c.objectType === accessPassType,
   );
@@ -458,7 +458,7 @@ export async function decryptVideo(video, knownAccessPassId) {
 
   const sessionKey = await SessionKeyClass.create({
     address: connectedAccount.address,
-    packageId: paywallPackageId,
+    packageId: gatingPackageId,
     ttlMin: 10,
     suiClient,
   });
@@ -488,7 +488,7 @@ export async function decryptVideo(video, knownAccessPassId) {
 
   const tx = new Transaction();
   tx.moveCall({
-    target: paywallPackageId + '::gating::seal_approve',
+    target: gatingPackageId + '::gating::seal_approve',
     arguments: [
       tx.pure.vector('u8', fromHex(sealId)),
       tx.object(accessPassId),
@@ -514,7 +514,7 @@ export async function decryptVideoAsOwner(video) {
 
   const sessionKey = await SessionKeyClass.create({
     address: connectedAccount.address,
-    packageId: paywallPackageId,
+    packageId: gatingPackageId,
     ttlMin: 10,
     suiClient,
   });
@@ -541,7 +541,7 @@ export async function decryptVideoAsOwner(video) {
 
   const tx = new Transaction();
   tx.moveCall({
-    target: paywallPackageId + '::gating::seal_approve_owner',
+    target: gatingPackageId + '::gating::seal_approve_owner',
     arguments: [
       tx.pure.vector('u8', fromHex(sealId)),
       tx.object(video.sui_object_id),
@@ -596,6 +596,6 @@ export function getWalletAddress() {
   return connectedAccount ? connectedAccount.address : null;
 }
 
-export function getPaywallPackageId() {
-  return paywallPackageId;
+export function getGatingPackageId() {
+  return gatingPackageId;
 }

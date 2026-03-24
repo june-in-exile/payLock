@@ -39,6 +39,12 @@ func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, err.status, map[string]string{"error": err.msg})
 		return
 	}
+	if price > 0 && !h.cfg.FFmpegEnabled {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "paid uploads require ffmpeg (set PAYLOCK_ENABLE_FFMPEG=true and install ffmpeg)",
+		})
+		return
+	}
 
 	id := generateID()
 	if title == "" {

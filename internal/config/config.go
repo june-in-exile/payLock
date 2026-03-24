@@ -19,7 +19,7 @@ type Config struct {
 	FFprobePath      string
 	PreviewDuration  int
 	SuiRPCURL        string
-	PaywallPackageID string
+	GatingPackageID  string
 	DataDir          string
 }
 
@@ -33,12 +33,12 @@ func Load() (*Config, error) {
 		WalrusAggregator: envOrDefault("PAYLOCK_WALRUS_AGGREGATOR_URL", "https://aggregator.walrus-testnet.walrus.space"),
 		WalrusEpochs:     5,
 		DataDir:          envOrDefault("PAYLOCK_DATA_DIR", "data"),
-		FFmpegEnabled:    envBoolOrDefault("PAYLOCK_ENABLE_FFMPEG", false),
+		FFmpegEnabled:    envBoolOrDefault("PAYLOCK_ENABLE_FFMPEG", true),
 		FFmpegPath:       envOrDefault("PAYLOCK_FFMPEG_PATH", "ffmpeg"),
 		FFprobePath:      envOrDefault("PAYLOCK_FFPROBE_PATH", "ffprobe"),
 		PreviewDuration:  10,
 		SuiRPCURL:        envOrDefault("PAYLOCK_SUI_RPC_URL", "https://fullnode.testnet.sui.io:443"),
-		PaywallPackageID: os.Getenv("PAYLOCK_PAYWALL_PACKAGE_ID"),
+		GatingPackageID:  envOrDefault("PAYLOCK_GATING_PACKAGE_ID", "0xec50faf6c1bb5720d7744476282a7b22600254de3ed849808ff9aacef8ba161a"),
 	}
 
 	if v := os.Getenv("PAYLOCK_MAX_FILE_SIZE_MB"); v != "" {

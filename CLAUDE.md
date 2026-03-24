@@ -25,7 +25,8 @@ go test ./internal/processor/... -run TestValidateMagicBytes -v
 | `PAYLOCK_WALRUS_EPOCHS` | `5` | Number of storage epochs to pay for |
 | `PAYLOCK_DATA_DIR` | `data` | Local directory for persisted video metadata |
 | `PAYLOCK_MAX_FILE_SIZE_MB` | `500` | Upload size limit in MB |
-| `PAYLOCK_PAYWALL_PACKAGE_ID` | *(none)* | Deployed paywall Move package ID on Sui |
+| `PAYLOCK_ENABLE_FFMPEG` | `true` | Enable FFmpeg processing for preview/thumbnail |
+| `PAYLOCK_GATING_PACKAGE_ID` | *(none)* | Deployed gating Move package ID on Sui |
 | `PAYLOCK_SUI_RPC_URL` | `https://fullnode.testnet.sui.io:443` | Sui JSON-RPC endpoint |
 
 ## Architecture
@@ -50,7 +51,7 @@ internal/middleware/      — CORS middleware
 ### Key design decisions
 
 - **Upload flow is async**: `POST /api/upload` validates the MP4 (magic bytes), returns `202 processing` immediately; a goroutine uploads to Walrus; poll `GET /api/status/{id}` for `ready`/`failed`.
-- **Paid vs free upload split**: Free videos upload both blobs server-side. Paid videos upload only preview server-side; the frontend handles Seal encryption + Walrus upload of the full blob.
+- **Paid vs free upload split**: Free videos upload both blobs server-side. Paid videos upload only preview server-side; the frontend handles Seal encryption + Walrus upload of the full blob. Paid uploads require FFmpeg enabled on the server to generate the preview.
 - **Seal encryption (Phase 2)**: Full blob of paid videos is encrypted with `@mysten/seal` in the browser. The flow: generate random 32-byte namespace → encrypt with Seal using namespace as prefix → upload encrypted blob to Walrus → create Video on-chain with blob IDs and namespace (single transaction).
 - **Purchase flow**: User pays via `purchase_and_transfer` → mints AccessPass → Seal SessionKey + `seal_approve` tx → decrypt encrypted blob in browser → play via blob URL.
 - **No local file storage**: Videos go directly to Walrus. No HLS segmentation.

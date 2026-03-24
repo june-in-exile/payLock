@@ -115,7 +115,7 @@ module paylock::gating {
 | `PAYLOCK_WALRUS_EPOCHS` | `5` | Walrus 儲存期數 |
 | `PAYLOCK_PREVIEW_DURATION` | `10` | 預覽片段秒數 |
 | `PAYLOCK_SUI_RPC_URL` | `...` | Sui RPC (Testnet) |
-| `PAYLOCK_PAYWALL_PACKAGE_ID` | _(必填)_ | 部署後的合約 Package ID |
+| `PAYLOCK_GATING_PACKAGE_ID` | _(必填)_ | 部署後的合約 Package ID |
 
 ### 啟動服務
 

@@ -10,7 +10,7 @@ PayLock is a **decentralized video storage infrastructure** for Sui. It manages 
 
 - Video uploads are stored directly on Walrus via the Publisher API.
 - Streaming is handled via HTTP 307 redirects to the Walrus Aggregator.
-- FFmpeg processing is temporarily disabled during this migration phase and will be re-integrated for HLS segmentation and Seal-based encryption in Phase 1.
+- FFmpeg processing is optional. When disabled, paid uploads are rejected to avoid leaking full videos as previews.
 
 ## Build Commands
 
@@ -35,7 +35,7 @@ go test ./internal/walrus/... -run TestStore -v
 ## Prerequisites
 
 - Go 1.25+
-- (Future/Phase 1) `ffmpeg` and `ffprobe` for video segmentation
+- (Optional) `ffmpeg` and `ffprobe` when enabling server-side preview/thumbnail processing
 
 ## Code Style Guidelines
 
@@ -103,8 +103,10 @@ import (
 | `PAYLOCK_PORT` | `8080` | HTTP listen port |
 | `PAYLOCK_WALRUS_PUBLISHER_URL` | `https://publisher.walrus-testnet.walrus.space` | Walrus Publisher API |
 | `PAYLOCK_WALRUS_AGGREGATOR_URL` | `https://aggregator.walrus-testnet.walrus.space` | Walrus Aggregator API |
-| `PAYLOCK_WALRUS_EPOCHS` | `1` | Default storage duration in epochs |
+| `PAYLOCK_WALRUS_EPOCHS` | `5` | Default storage duration in epochs |
 | `PAYLOCK_MAX_FILE_SIZE_MB` | `500` | Upload size limit in MB |
+| `PAYLOCK_ENABLE_FFMPEG` | `true` | Enable FFmpeg processing for preview/thumbnail |
+| `PAYLOCK_GATING_PACKAGE_ID` | `0xec50faf6c1bb5720d7744476282a7b22600254de3ed849808ff9aacef8ba161a` | Deployed gating Move package ID on Sui |
 
 ## Directory Structure
 

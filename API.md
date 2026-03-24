@@ -146,7 +146,7 @@
 
     ```json
     {
-      "paywall_package_id": "0x...",
+      "gating_package_id": "0x...",
       "walrus_publisher_url": "https://...",
       "walrus_aggregator_url": "https://..."
     }

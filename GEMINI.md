@@ -8,7 +8,7 @@ PayLock is a **video-native decentralized storage infrastructure** for Sui. It i
 
 - **Language**: Go (v1.25+)
 - **Storage**: Walrus (Testnet)
-- **Video Processing**: FFmpeg (temporarily disabled during v2 migration)
+- **Video Processing**: FFmpeg (optional; required for paid uploads to generate previews)
 - **Architecture**:
   - `cmd/paylock`: Server entry point.
   - `internal/handler`: HTTP handlers (Upload/Status/Videos). Now integrates with Walrus.
@@ -38,3 +38,5 @@ PayLock is a **video-native decentralized storage infrastructure** for Sui. It i
 - `PAYLOCK_WALRUS_PUBLISHER_URL`: Walrus publisher endpoint.
 - `PAYLOCK_WALRUS_AGGREGATOR_URL`: Walrus aggregator endpoint.
 - `PAYLOCK_WALRUS_EPOCHS`: Number of epochs to store blobs on Walrus.
+- `PAYLOCK_ENABLE_FFMPEG`: Enable FFmpeg processing for previews and thumbnails (default true).
+- `PAYLOCK_GATING_PACKAGE_ID`: Deployed gating Move package ID on Sui.
