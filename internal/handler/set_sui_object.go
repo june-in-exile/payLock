@@ -51,6 +51,13 @@ func (h *SetSuiObject) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !verifyCreator(video, r.Header.Get(creatorHeader)) {
+		writeJSON(w, http.StatusForbidden, map[string]string{
+			"error": "forbidden: X-Creator does not match video creator",
+		})
+		return
+	}
+
 	if video.SuiObjectID != "" && video.SuiObjectID != body.SuiObjectID {
 		writeJSON(w, http.StatusConflict, map[string]string{
 			"error": "sui object id already set to a different value",

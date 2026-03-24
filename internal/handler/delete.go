@@ -24,13 +24,22 @@ func (h *Delete) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !h.videos.Delete(id) {
+	video, ok := h.videos.Get(id)
+	if !ok {
 		writeJSON(w, http.StatusNotFound, map[string]string{
 			"error": "video not found",
 		})
 		return
 	}
 
+	if !verifyCreator(video, r.Header.Get(creatorHeader)) {
+		writeJSON(w, http.StatusForbidden, map[string]string{
+			"error": "forbidden: X-Creator does not match video creator",
+		})
+		return
+	}
+
+	h.videos.Delete(id)
 	slog.Info("video deleted", "id", id)
 	writeJSON(w, http.StatusOK, map[string]string{
 		"id":     id,

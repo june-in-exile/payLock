@@ -2,7 +2,7 @@
 
 本文檔提供 PayLock 後端服務的完整 API 規格，專為希望將「影片付費解鎖」功能整合進其 dApp 的開發者設計。
 
-> **認證**: 所有 API 端點目前不需要認證。
+> **認證**: 變更類操作 (`PUT`, `DELETE`) 需要 `X-Creator` header，值為影片創作者的 Sui 地址。伺服器會比對該地址與影片記錄中的 `creator` 欄位。若影片無 `creator`，則不做檢查。
 > **CORS**: Stream 端點 (`/stream/*`) 已啟用 CORS；API 端點 (`/api/*`) 未設 CORS header。
 
 ---
@@ -145,7 +145,7 @@ data: {"id":"...","status":"processing","title":"My Video","price":0,"created_at
 
 data: {"id":"...","status":"ready","preview_blob_id":"...","preview_blob_url":"...","full_blob_id":"...","full_blob_url":"...","created_at":"..."}
 ```
-
+k54
 連線在 `status` 變為 `ready` 或 `failed` 後由伺服器關閉。
 
 ---
@@ -155,6 +155,8 @@ data: {"id":"...","status":"ready","preview_blob_id":"...","preview_blob_url":".
 **`PUT /api/videos/{id}/sui-object`**
 
 前端完成鏈上 `create_video` 交易後，將 Sui 物件 ID 與加密完整 Blob ID 寫回後端。
+
+- **需要認證**: 須附帶 `X-Creator` header，值為影片的創作者 Sui 地址。
 
 **Request Body** (`application/json`):
 
@@ -184,6 +186,7 @@ data: {"id":"...","status":"ready","preview_blob_id":"...","preview_blob_url":".
 | Status | 原因 |
 |--------|------|
 | `400` | 缺少 video id / request body 無效 / `sui_object_id` 為空 |
+| `403` | `X-Creator` 不符合影片的 creator |
 | `404` | 影片不存在 |
 | `409` | 該影片已綁定不同的 `sui_object_id` |
 
@@ -193,7 +196,15 @@ data: {"id":"...","status":"ready","preview_blob_id":"...","preview_blob_url":".
 
 **`GET /api/videos`**
 
-取得系統中所有影片列表。
+取得影片列表，按 `created_at` 降序排列（最新在前）。支援篩選與分頁。
+
+**Query Parameters**:
+
+| 參數 | 預設 | 說明 |
+|------|------|------|
+| `creator` | *(無)* | 按創作者 Sui 地址篩選 |
+| `page` | `1` | 頁碼（從 1 開始） |
+| `per_page` | `20` | 每頁筆數（上限 100） |
 
 **成功回應** (`200 OK`):
 
@@ -202,7 +213,10 @@ data: {"id":"...","status":"ready","preview_blob_id":"...","preview_blob_url":".
   "videos": [
     { "id": "...", "title": "...", "status": "ready", "price": 0, "thumbnail_blob_url": "...", "created_at": "..." },
     { "id": "...", "title": "...", "status": "ready", "price": 1000000000, "encrypted": true, "sui_object_id": "0x...", "created_at": "..." }
-  ]
+  ],
+  "total": 42,
+  "page": 1,
+  "per_page": 20
 }
 ```
 
@@ -214,14 +228,21 @@ data: {"id":"...","status":"ready","preview_blob_id":"...","preview_blob_url":".
 
 從後端 Metadata Store 中刪除該影片記錄。
 
+- **需要認證**: 須附帶 `X-Creator` header，值為影片的創作者 Sui 地址。
+
 > **注意**: 這不會刪除 Walrus 上的 Blob 或鏈上的 Video 物件。
 
-**成功回應**: `204 No Content`
+**成功回應** (`200 OK`):
+
+```json
+{ "id": "...", "status": "deleted" }
+```
 
 **錯誤回應**:
 
 | Status | 原因 |
 |--------|------|
+| `403` | `X-Creator` 不符合影片的 creator |
 | `404` | 影片不存在 |
 
 ---
