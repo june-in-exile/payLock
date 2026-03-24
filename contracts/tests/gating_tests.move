@@ -3,7 +3,6 @@ module paylock::gating_tests {
     use sui::test_scenario::{Self as ts, Scenario};
     use sui::coin;
     use sui::sui::SUI;
-    use sui::object;
     use std::string;
 
     use paylock::gating::{Self, Video, AccessPass};
@@ -46,7 +45,8 @@ module paylock::gating_tests {
             assert!(gating::video_creator(&video) == CREATOR);
             assert!(gating::video_preview_blob_id(&video) == &string::utf8(b"preview_blob_abc"));
             assert!(gating::video_full_blob_id(&video) == &string::utf8(b"full_blob_xyz"));
-            assert!(gating::video_seal_namespace(&video) == &TEST_NAMESPACE);
+            let expected_ns = TEST_NAMESPACE;
+            assert!(gating::video_seal_namespace(&video) == &expected_ns);
             ts::return_shared(video);
         };
 

@@ -1,10 +1,8 @@
 module paylock::gating {
     use sui::coin::{Self, Coin};
     use sui::sui::SUI;
-    use sui::transfer;
-    use sui::object::{Self, UID, ID};
-    use sui::tx_context::{Self, TxContext};
     use std::string::String;
+
 
     // === Error codes ===
     const EInsufficientPayment: u64 = 0;
