@@ -1,0 +1,8 @@
+[phases.setup]
+pkgs = ["go", "ffmpeg"]
+
+[phases.build]
+cmds = ["go build -o paylock ./cmd/paylock"]
+
+[start]
+cmd = "./paylock"
