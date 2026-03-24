@@ -50,7 +50,6 @@ func main() {
 	mux.Handle("GET /api/videos", handler.NewVideos(videos))
 	mux.Handle("DELETE /api/videos/{id}", handler.NewDelete(videos))
 	mux.Handle("PUT /api/videos/{id}/sui-object", handler.NewSetSuiObject(videos))
-	mux.Handle("PUT /api/videos/{id}/full-blob", handler.NewSetFullBlob(wc, videos))
 	mux.Handle("GET /api/config", handler.NewAppConfig(cfg))
 
 	// Stream routes — redirect to Walrus aggregator

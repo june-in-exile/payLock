@@ -77,7 +77,7 @@ func (h *Upload) parseRequest(r *http.Request) ([]byte, string, uint64, string, 
 	}
 
 	if err := processor.ValidateMagicBytes(bytes.NewReader(data)); err != nil {
-		return nil, "", 0, "", &requestError{http.StatusBadRequest, "invalid file format: only MP4 files are accepted"}
+		return nil, "", 0, "", &requestError{http.StatusBadRequest, "invalid file format: supported formats are MP4, MOV, WebM, MKV, AVI"}
 	}
 
 	title := r.FormValue("title")

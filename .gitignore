@@ -1,7 +1,10 @@
 storage/
 data/
 bin/
+testdata/
 *.mp4
+*.mov
+*.MOV
 *.ts
 *.m3u8
 .env

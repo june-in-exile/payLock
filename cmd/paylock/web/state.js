@@ -76,8 +76,10 @@ export function showToast(type, message, duration = 3000) {
 // --- Staged file ---
 
 export function stageNewFile(file) {
-  if (!file.name.toLowerCase().endsWith('.mp4')) {
-    showToast('error', 'Only MP4 files are accepted.');
+  const ext = file.name.toLowerCase().split('.').pop();
+  const supported = ['mp4', 'mov', 'webm', 'mkv', 'avi'];
+  if (!supported.includes(ext)) {
+    showToast('error', 'Unsupported format. Accepted: MP4, MOV, WebM, MKV, AVI.');
     return;
   }
   const prev = stagedFile.value;

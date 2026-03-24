@@ -163,19 +163,6 @@ func (s *VideoStore) SetSuiObjectID(id, suiObjectID string) bool {
 	return true
 }
 
-func (s *VideoStore) SetFullBlob(id, fullBlobID, fullBlobURL string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	v, ok := s.videos[id]
-	if !ok {
-		return false
-	}
-	v.FullBlobID = fullBlobID
-	v.FullBlobURL = fullBlobURL
-	s.persist()
-	return true
-}
-
 func (s *VideoStore) SetFailed(id string, errMsg string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

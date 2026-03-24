@@ -58,7 +58,7 @@ function UploadSteps({ step, previewDone, browserStep }) {
       </div>
       <div class=${stepCls(onchainStatus)}>
         <span class="upload-step-icon"></span>
-        <span>Publishing blob IDs on-chain</span>
+        <span>Creating video on-chain</span>
       </div>
     </div>
   `;
@@ -266,14 +266,14 @@ async function confirmUpload(fileInput) {
           uploadState.value = { ...uploadState.value, previewDone: true };
           return v;
         }),
-        mod.encryptAndPublish(data.id, fileArrayBuffer, priceMist, (browserStep) => {
+        mod.encryptAndPublish(fileArrayBuffer, (browserStep) => {
           uploadState.value = { ...uploadState.value, browserStep };
           if (browserStep === 'walrus') uploadState.value = { ...uploadState.value, text: 'Uploading encrypted blob to Walrus...' };
         }),
       ]);
 
-      uploadState.value = { ...uploadState.value, step: 'onchain', previewDone: true, browserStep: 'done', text: 'Publishing blob IDs on-chain...' };
-      await mod.updateBlobIds(encResult.suiObjectId, data.id, video.preview_blob_id, encResult.fullBlobId);
+      uploadState.value = { ...uploadState.value, step: 'onchain', previewDone: true, browserStep: 'done', text: 'Creating video on-chain...' };
+      await mod.createVideoOnChain(data.id, priceMist, video.preview_blob_id, encResult.fullBlobId, encResult.namespace);
     }
 
     uploadState.value = { active: false, percent: 0, text: '', step: null, showSpinner: false, showSteps: false };
@@ -340,9 +340,9 @@ export function VideosView() {
           <h2 style="margin-bottom:0;">Videos</h2>
           <div style="display:flex; gap:0.75rem; align-items:center;">
             <button class="btn" onclick=${handleUploadAction}>
-              ${staged ? 'Confirm Upload' : 'Select MP4'}
+              ${staged ? 'Confirm Upload' : 'Select Video'}
             </button>
-            <input type="file" ref=${inputRef} accept="video/mp4,.mp4" style="display:none" onchange=${onFileChange} />
+            <input type="file" ref=${inputRef} accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/avi,.mp4,.mov,.webm,.mkv,.avi" style="display:none" onchange=${onFileChange} />
           </div>
         </div>
       </div>

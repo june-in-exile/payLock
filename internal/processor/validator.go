@@ -9,24 +9,45 @@ import (
 	"os/exec"
 )
 
+// SupportedExtensions lists accepted video file extensions (lowercase, with dot).
+var SupportedExtensions = map[string]bool{
+	".mp4":  true,
+	".mov":  true,
+	".webm": true,
+	".mkv":  true,
+	".avi":  true,
+}
+
 var (
-	ErrInvalidFormat = errors.New("invalid video format: not an MP4 file")
+	ErrInvalidFormat = errors.New("invalid video format: supported formats are MP4, MOV, WebM, MKV, AVI")
 	ErrFileTooLarge  = errors.New("file exceeds maximum allowed size")
+
+	// EBML magic bytes (WebM, MKV)
+	ebmlMagic = []byte{0x1A, 0x45, 0xDF, 0xA3}
 )
 
-// ValidateMagicBytes checks that the reader starts with an MP4 ftyp box.
-// MP4 files have "ftyp" at byte offset 4.
+// ValidateMagicBytes checks that the reader starts with a supported video format.
+// Supported: MP4/MOV (ftyp box), WebM/MKV (EBML header), AVI (RIFF/AVI).
 func ValidateMagicBytes(r io.Reader) error {
 	header := make([]byte, 12)
 	n, err := io.ReadFull(r, header)
-	if err != nil || n < 8 {
+	if err != nil || n < 12 {
 		return ErrInvalidFormat
 	}
-	// MP4: bytes 4-7 should be "ftyp"
-	if string(header[4:8]) != "ftyp" {
-		return ErrInvalidFormat
+
+	switch {
+	case string(header[4:8]) == "ftyp":
+		// MP4, MOV, and other ISO base media formats
+		return nil
+	case bytes.Equal(header[:4], ebmlMagic):
+		// WebM, MKV (EBML container)
+		return nil
+	case string(header[:4]) == "RIFF" && string(header[8:12]) == "AVI ":
+		// AVI
+		return nil
 	}
-	return nil
+
+	return ErrInvalidFormat
 }
 
 func ValidateSize(size int64, maxSize int64) error {

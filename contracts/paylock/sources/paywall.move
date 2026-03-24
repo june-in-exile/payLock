@@ -10,7 +10,7 @@ module paylock::paywall {
     const EInsufficientPayment: u64 = 0;
     const EVideoMismatch: u64 = 1;
     const EInvalidSealId: u64 = 2;
-    const ENotCreator: u64 = 3;
+    const EMissingSealNamespace: u64 = 3;
 
     // === Structs ===
 
@@ -22,6 +22,7 @@ module paylock::paywall {
         creator: address,
         preview_blob_id: String,
         full_blob_id: String,
+        seal_namespace: vector<u8>,
     }
 
     /// Proof of purchase, minted after payment. Owned by the buyer.
@@ -33,18 +34,25 @@ module paylock::paywall {
     // === Public functions ===
 
     /// Creator publishes a new video with preview and full blob IDs.
+    /// For paid videos (price > 0), seal_namespace must be non-empty.
     public fun create_video(
         price: u64,
         preview_blob_id: String,
         full_blob_id: String,
+        seal_namespace: vector<u8>,
         ctx: &mut TxContext,
     ) {
+        if (price > 0) {
+            assert!(vector::length(&seal_namespace) > 0, EMissingSealNamespace);
+        };
+
         let video = Video {
             id: object::new(ctx),
             price,
             creator: tx_context::sender(ctx),
             preview_blob_id,
             full_blob_id,
+            seal_namespace,
         };
         transfer::share_object(video);
     }
@@ -68,26 +76,6 @@ module paylock::paywall {
         pass
     }
 
-    /// Creator updates the preview blob ID after Walrus upload.
-    public fun update_preview_blob_id(
-        video: &mut Video,
-        preview_blob_id: String,
-        ctx: &TxContext,
-    ) {
-        assert!(tx_context::sender(ctx) == video.creator, ENotCreator);
-        video.preview_blob_id = preview_blob_id;
-    }
-
-    /// Creator updates the full blob ID after Seal encryption + Walrus upload.
-    public fun update_full_blob_id(
-        video: &mut Video,
-        full_blob_id: String,
-        ctx: &TxContext,
-    ) {
-        assert!(tx_context::sender(ctx) == video.creator, ENotCreator);
-        video.full_blob_id = full_blob_id;
-    }
-
     /// Convenience entry function: purchases and transfers AccessPass to buyer.
     /// Takes payment coin by value so the wallet correctly shows the outflow.
     entry fun purchase_and_transfer(
@@ -109,7 +97,7 @@ module paylock::paywall {
     /// Seal key server calls this to verify decryption rights.
     /// Validates that:
     /// 1. The AccessPass belongs to the referenced Video
-    /// 2. The seal `id` starts with the Video object's ID bytes (namespace prefix)
+    /// 2. The seal `id` starts with the Video's seal_namespace bytes (prefix match)
     entry fun seal_approve(
         id: vector<u8>,
         pass: &AccessPass,
@@ -117,15 +105,15 @@ module paylock::paywall {
     ) {
         assert!(pass.video_id == object::id(video), EVideoMismatch);
 
-        let video_id_bytes = object::id_bytes(video);
-        let prefix_len = vector::length(&video_id_bytes);
+        let prefix = &video.seal_namespace;
+        let prefix_len = vector::length(prefix);
         let id_len = vector::length(&id);
         assert!(id_len >= prefix_len, EInvalidSealId);
 
         let mut i = 0;
         while (i < prefix_len) {
             assert!(
-                *vector::borrow(&id, i) == *vector::borrow(&video_id_bytes, i),
+                *vector::borrow(&id, i) == *vector::borrow(prefix, i),
                 EInvalidSealId,
             );
             i = i + 1;
@@ -138,5 +126,6 @@ module paylock::paywall {
     public fun video_creator(video: &Video): address { video.creator }
     public fun video_preview_blob_id(video: &Video): &String { &video.preview_blob_id }
     public fun video_full_blob_id(video: &Video): &String { &video.full_blob_id }
+    public fun video_seal_namespace(video: &Video): &vector<u8> { &video.seal_namespace }
     public fun access_pass_video_id(pass: &AccessPass): ID { pass.video_id }
 }

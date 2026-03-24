@@ -37,7 +37,6 @@ cmd/paylock/main.go          — wires all packages; route groups:
                             POST /api/upload, GET /api/status/{id}
                             GET /api/videos, DELETE /api/videos/{id}
                             PUT /api/videos/{id}/sui-object, GET /api/config
-                            PUT /api/videos/{id}/full-blob
                             GET /stream/{id}                        → redirects to Walrus
 
 internal/config/          — env-based config
@@ -52,7 +51,7 @@ internal/middleware/      — CORS middleware
 
 - **Upload flow is async**: `POST /api/upload` validates the MP4 (magic bytes), returns `202 processing` immediately; a goroutine uploads to Walrus; poll `GET /api/status/{id}` for `ready`/`failed`.
 - **Paid vs free upload split**: Free videos upload both blobs server-side. Paid videos upload only preview server-side; the frontend handles Seal encryption + Walrus upload of the full blob.
-- **Seal encryption (Phase 2)**: Full blob of paid videos is encrypted with `@mysten/seal` in the browser. The flow: create Video on-chain with empty full_blob_id → encrypt with Seal using Video object ID as namespace → upload encrypted blob to Walrus → update full_blob_id on-chain and backend.
+- **Seal encryption (Phase 2)**: Full blob of paid videos is encrypted with `@mysten/seal` in the browser. The flow: generate random 32-byte namespace → encrypt with Seal using namespace as prefix → upload encrypted blob to Walrus → create Video on-chain with blob IDs and namespace (single transaction).
 - **Purchase flow**: User pays via `purchase_and_transfer` → mints AccessPass → Seal SessionKey + `seal_approve` tx → decrypt encrypted blob in browser → play via blob URL.
 - **No local file storage**: Videos go directly to Walrus. No HLS segmentation.
 - **VideoStore persists to disk**: Video metadata is saved as `videos.json` in `PAYLOCK_DATA_DIR` (default `data/`). Deleting the file only removes local records; Walrus blobs are unaffected.
