@@ -1,0 +1,12 @@
+[build]
+builder = "NIXPACKS"
+pkgs = ["go", "ffmpeg"]
+
+[deploy]
+buildCommand = "go build -o paylock ./cmd/paylock"
+startCommand = "./paylock"
+restartPolicy = "on-failure"
+
+[env]
+PAYLOCK_PORT = "${{PORT}}"
+PAYLOCK_DATA_DIR = "/tmp/data"
