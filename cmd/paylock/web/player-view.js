@@ -43,12 +43,12 @@ function ChainStatus({ video }) {
   return null;
 }
 
-function PaywallOverlay({ video, onPurchase, purchaseText, purchasing, hint }) {
+function PaywallOverlay({ video, onPurchase, purchaseText, purchasing, hint, isOwner }) {
   if (!video) return null;
   return html`
     <div class="paywall-overlay" style="display: flex;">
-      <div class="paywall-label">Preview ended</div>
-      <div class="paywall-price">${formatSui(video.price)} SUI</div>
+      <div class="paywall-label">${isOwner ? 'Full video preview' : 'Preview ended'}</div>
+      ${!isOwner && html`<div class="paywall-price">${formatSui(video.price)} SUI</div>`}
       <button class="btn" disabled=${purchasing} onclick=${onPurchase}>${purchaseText}</button>
       ${hint && html`<div class="paywall-label" style="font-size: 0.75rem; margin-top: 0.5rem;">${hint}</div>`}
     </div>
@@ -192,11 +192,19 @@ export function PlayerView() {
     playPreview(video, el);
   }, [video, status, wallet.connected]);
 
+  function isOwner(v) {
+    return v.creator && wallet.address && v.creator === wallet.address;
+  }
+
   async function tryAutoDecrypt(v, el) {
     try {
       const mod = await loadWallet();
-      const passId = await mod.findAccessPass(v.sui_object_id);
-      if (!passId) { playPreview(v, el); return; }
+      const ownerMode = isOwner(v);
+
+      if (!ownerMode) {
+        const passId = await mod.findAccessPass(v.sui_object_id);
+        if (!passId) { playPreview(v, el); return; }
+      }
 
       // Recover full_blob_url from chain if missing
       if (!v.full_blob_url) {
@@ -211,7 +219,9 @@ export function PlayerView() {
       if (!v.full_blob_url) { playPreview(v, el); return; }
 
       setStreamUrl('Decrypting full video...');
-      const blobUrl = await mod.decryptVideo(v);
+      const blobUrl = ownerMode
+        ? await mod.decryptVideoAsOwner(v)
+        : await mod.decryptVideo(v);
       revokeOldBlob(el);
       el.onended = null;
       setShowPaywall(false);
@@ -235,6 +245,7 @@ export function PlayerView() {
         setShowPaywall(true);
         if (!wallet.connected) setHint('Connect wallet to purchase');
         else if (!v.sui_object_id) setHint('Video not yet published on-chain');
+        else if (isOwner(v)) { setHint('You own this video'); setPurchaseText('Unlock'); }
         else setHint('');
       };
     }
@@ -262,12 +273,17 @@ export function PlayerView() {
       const mod = await loadWallet();
       const el = videoRef.current;
 
-      setPurchaseText('Checking access...');
-      let accessPassId = await mod.findAccessPass(video.sui_object_id);
+      const ownerMode = isOwner(video);
 
-      if (!accessPassId) {
-        setPurchaseText('Purchasing...');
-        accessPassId = await mod.purchaseVideo(video);
+      let accessPassId = null;
+      if (!ownerMode) {
+        setPurchaseText('Checking access...');
+        accessPassId = await mod.findAccessPass(video.sui_object_id);
+
+        if (!accessPassId) {
+          setPurchaseText('Purchasing...');
+          accessPassId = await mod.purchaseVideo(video);
+        }
       }
 
       if (!video.full_blob_url && video.sui_object_id) {
@@ -296,7 +312,9 @@ export function PlayerView() {
       }
 
       setPurchaseText('Decrypting...');
-      const blobUrl = await mod.decryptVideo(video, accessPassId);
+      const blobUrl = ownerMode
+        ? await mod.decryptVideoAsOwner(video)
+        : await mod.decryptVideo(video, accessPassId);
 
       revokeOldBlob(el);
       el.onended = null;
@@ -348,6 +366,7 @@ export function PlayerView() {
             purchaseText=${purchaseText}
             purchasing=${purchasing}
             hint=${hint}
+            isOwner=${video && isOwner(video)}
           />
         `}
 

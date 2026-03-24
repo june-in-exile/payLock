@@ -11,6 +11,7 @@ module paylock::paywall {
     const EVideoMismatch: u64 = 1;
     const EInvalidSealId: u64 = 2;
     const EMissingSealNamespace: u64 = 3;
+    const ENotCreator: u64 = 4;
 
     // === Structs ===
 
@@ -104,6 +105,30 @@ module paylock::paywall {
         video: &Video,
     ) {
         assert!(pass.video_id == object::id(video), EVideoMismatch);
+
+        let prefix = &video.seal_namespace;
+        let prefix_len = vector::length(prefix);
+        let id_len = vector::length(&id);
+        assert!(id_len >= prefix_len, EInvalidSealId);
+
+        let mut i = 0;
+        while (i < prefix_len) {
+            assert!(
+                *vector::borrow(&id, i) == *vector::borrow(prefix, i),
+                EInvalidSealId,
+            );
+            i = i + 1;
+        };
+    }
+
+    /// Seal key server calls this to verify decryption rights for the video creator.
+    /// The creator can decrypt without an AccessPass.
+    entry fun seal_approve_owner(
+        id: vector<u8>,
+        video: &Video,
+        ctx: &TxContext,
+    ) {
+        assert!(tx_context::sender(ctx) == video.creator, ENotCreator);
 
         let prefix = &video.seal_namespace;
         let prefix_len = vector::length(prefix);

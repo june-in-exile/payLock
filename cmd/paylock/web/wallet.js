@@ -358,8 +358,41 @@ export async function encryptAndPublish(fileData, onProgress) {
   return { namespace, fullBlobId };
 }
 
+function accessPassCacheKey(videoSuiObjectId) {
+  if (!connectedAccount) return null;
+  return 'paylock_ap_' + connectedAccount.address + '_' + videoSuiObjectId;
+}
+
+function getCachedAccessPass(videoSuiObjectId) {
+  const key = accessPassCacheKey(videoSuiObjectId);
+  if (!key) return null;
+  return localStorage.getItem(key);
+}
+
+function cacheAccessPass(videoSuiObjectId, accessPassId) {
+  const key = accessPassCacheKey(videoSuiObjectId);
+  if (!key || !accessPassId) return;
+  localStorage.setItem(key, accessPassId);
+}
+
 export async function findAccessPass(videoSuiObjectId) {
   if (!connectedAccount || !paywallPackageId) return null;
+
+  // Check localStorage cache first
+  const cached = getCachedAccessPass(videoSuiObjectId);
+  if (cached) {
+    try {
+      const obj = await suiClient.getObject({ id: cached, options: { showOwner: true } });
+      if (obj.data && obj.data.owner && obj.data.owner.AddressOwner === connectedAccount.address) {
+        return cached;
+      }
+    } catch (_) {
+      // Cache stale — fall through to on-chain query
+    }
+    const key = accessPassCacheKey(videoSuiObjectId);
+    if (key) localStorage.removeItem(key);
+  }
+
   const accessPassType = paywallPackageId + '::paywall::AccessPass';
   let cursor = null;
   let hasNext = true;
@@ -373,6 +406,7 @@ export async function findAccessPass(videoSuiObjectId) {
     for (const obj of result.data) {
       if (obj.data && obj.data.content && obj.data.content.fields) {
         if (obj.data.content.fields.video_id === videoSuiObjectId) {
+          cacheAccessPass(videoSuiObjectId, obj.data.objectId);
           return obj.data.objectId;
         }
       }
@@ -410,7 +444,11 @@ export async function purchaseVideo(video) {
     (c) => c.type === 'created' && c.objectType === accessPassType,
   );
 
-  return created ? created.objectId : null;
+  const accessPassId = created ? created.objectId : null;
+  if (accessPassId && video.sui_object_id) {
+    cacheAccessPass(video.sui_object_id, accessPassId);
+  }
+  return accessPassId;
 }
 
 export async function decryptVideo(video, knownAccessPassId) {
@@ -454,6 +492,58 @@ export async function decryptVideo(video, knownAccessPassId) {
     arguments: [
       tx.pure.vector('u8', fromHex(sealId)),
       tx.object(accessPassId),
+      tx.object(video.sui_object_id),
+    ],
+  });
+  const txBytes = await tx.build({ client: suiClient, onlyTransactionKind: true });
+
+  const decryptedBytes = await sealClient.decrypt({
+    data: encryptedData,
+    sessionKey,
+    txBytes,
+  });
+
+  const blob = new Blob([decryptedBytes], { type: 'video/mp4' });
+  return URL.createObjectURL(blob);
+}
+
+export async function decryptVideoAsOwner(video) {
+  if (!connectedWallet || !connectedAccount) throw new Error('Wallet not connected');
+  if (!sealClient || !SessionKeyClass || !EncryptedObjectClass) throw new Error('Seal SDK not loaded');
+  if (!video.full_blob_url) throw new Error('Encrypted blob not available — upload may have failed');
+
+  const sessionKey = await SessionKeyClass.create({
+    address: connectedAccount.address,
+    packageId: paywallPackageId,
+    ttlMin: 10,
+    suiClient,
+  });
+
+  const message = sessionKey.getPersonalMessage();
+  const signFeature = connectedWallet.features['sui:signPersonalMessage'];
+  if (!signFeature) throw new Error('Wallet does not support signPersonalMessage');
+  const signResult = await signFeature.signPersonalMessage({
+    message,
+    account: connectedAccount,
+  });
+  sessionKey.setPersonalMessageSignature(signResult.signature);
+
+  const encryptedRes = await fetch(video.full_blob_url);
+  if (!encryptedRes.ok) throw new Error('Failed to fetch encrypted blob (HTTP ' + encryptedRes.status + ')');
+  const encryptedData = new Uint8Array(await encryptedRes.arrayBuffer());
+  if (encryptedData.length > 0 && encryptedData[0] === 0x7B) {
+    const text = new TextDecoder().decode(encryptedData);
+    throw new Error('Walrus returned an error instead of encrypted data: ' + text.slice(0, 200));
+  }
+
+  const parsedEncrypted = EncryptedObjectClass.parse(encryptedData);
+  const sealId = parsedEncrypted.id;
+
+  const tx = new Transaction();
+  tx.moveCall({
+    target: paywallPackageId + '::paywall::seal_approve_owner',
+    arguments: [
+      tx.pure.vector('u8', fromHex(sealId)),
       tx.object(video.sui_object_id),
     ],
   });

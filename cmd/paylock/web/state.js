@@ -111,9 +111,9 @@ export async function loadWallet() {
   if (walletModule) return walletModule;
   if (walletLoading) return walletLoading;
   walletLoading = import('./wallet.js')
-    .then((mod) => {
+    .then(async (mod) => {
+      await mod.initWallet();
       walletModule = mod;
-      mod.initWallet();
       return mod;
     })
     .catch((err) => {
