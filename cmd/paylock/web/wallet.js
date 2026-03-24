@@ -317,7 +317,7 @@ export async function createVideoOnChain(videoId, price, previewBlobId, fullBlob
   const res = await fetch('/api/videos/' + encodeURIComponent(videoId) + '/sui-object', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sui_object_id: suiObjectId }),
+    body: JSON.stringify({ sui_object_id: suiObjectId, full_blob_id: fullBlobId }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -467,6 +467,35 @@ export async function decryptVideo(video, knownAccessPassId) {
 
   const blob = new Blob([decryptedBytes], { type: 'video/mp4' });
   return URL.createObjectURL(blob);
+}
+
+export async function recoverFullBlobId(video) {
+  if (!suiClient) throw new Error('Sui client not loaded');
+  if (!video.sui_object_id) throw new Error('No on-chain object to recover from');
+
+  const obj = await suiClient.getObject({
+    id: video.sui_object_id,
+    options: { showContent: true },
+  });
+
+  const fields = obj.data && obj.data.content && obj.data.content.fields;
+  if (!fields || !fields.full_blob_id) {
+    throw new Error('Could not read full_blob_id from on-chain Video object');
+  }
+
+  const fullBlobId = fields.full_blob_id;
+
+  const res = await fetch('/api/videos/' + encodeURIComponent(video.id) + '/sui-object', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sui_object_id: video.sui_object_id, full_blob_id: fullBlobId }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error('Failed to save recovered blob ID: ' + (body.error || res.status));
+  }
+
+  return fullBlobId;
 }
 
 export function isWalletConnected() {

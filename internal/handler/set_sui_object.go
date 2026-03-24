@@ -9,10 +9,11 @@ import (
 
 type SetSuiObject struct {
 	videos *model.VideoStore
+	walrus Storer
 }
 
-func NewSetSuiObject(videos *model.VideoStore) *SetSuiObject {
-	return &SetSuiObject{videos: videos}
+func NewSetSuiObject(videos *model.VideoStore, walrus Storer) *SetSuiObject {
+	return &SetSuiObject{videos: videos, walrus: walrus}
 }
 
 func (h *SetSuiObject) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -26,6 +27,7 @@ func (h *SetSuiObject) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var body struct {
 		SuiObjectID string `json:"sui_object_id"`
+		FullBlobID  string `json:"full_blob_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{
@@ -49,14 +51,19 @@ func (h *SetSuiObject) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if video.SuiObjectID != "" {
+	if video.SuiObjectID != "" && video.SuiObjectID != body.SuiObjectID {
 		writeJSON(w, http.StatusConflict, map[string]string{
-			"error": "sui object id already set",
+			"error": "sui object id already set to a different value",
 		})
 		return
 	}
 
-	if !h.videos.SetSuiObjectID(id, body.SuiObjectID) {
+	var fullBlobURL string
+	if body.FullBlobID != "" {
+		fullBlobURL = h.walrus.BlobURL(body.FullBlobID)
+	}
+
+	if !h.videos.SetSuiObjectID(id, body.SuiObjectID, body.FullBlobID, fullBlobURL) {
 		writeJSON(w, http.StatusNotFound, map[string]string{
 			"error": "video not found",
 		})

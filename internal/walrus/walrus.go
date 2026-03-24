@@ -43,8 +43,28 @@ func NewClient(publisherURL, aggregatorURL string) *Client {
 	}
 }
 
+const maxRetries = 3
+
 // Store uploads data to Walrus and returns the blob ID.
+// Retries up to maxRetries times with exponential backoff on transient errors.
 func (c *Client) Store(data []byte, epochs int) (string, error) {
+	var lastErr error
+	for attempt := range maxRetries {
+		blobID, err := c.storeOnce(data, epochs)
+		if err == nil {
+			return blobID, nil
+		}
+		lastErr = err
+		if !isTransient(err) {
+			return "", err
+		}
+		backoff := time.Duration(math.Pow(2, float64(attempt))) * time.Second
+		time.Sleep(backoff)
+	}
+	return "", fmt.Errorf("store blob after %d attempts: %w", maxRetries, lastErr)
+}
+
+func (c *Client) storeOnce(data []byte, epochs int) (string, error) {
 	url := fmt.Sprintf("%s/v1/blobs?epochs=%d", c.publisherURL, epochs)
 	req, err := http.NewRequest(http.MethodPut, url, io.NopCloser(
 		io.NewSectionReader(readerAt(data), 0, int64(len(data))),
@@ -61,6 +81,10 @@ func (c *Client) Store(data []byte, epochs int) (string, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode >= 500 {
+		body, _ := io.ReadAll(resp.Body)
+		return "", &serverError{status: resp.StatusCode, body: string(body)}
+	}
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
 		return "", fmt.Errorf("store blob: status %d: %s", resp.StatusCode, string(body))
@@ -78,6 +102,31 @@ func (c *Client) Store(data []byte, epochs int) (string, error) {
 		return result.AlreadyCertified.BlobID, nil
 	}
 	return "", fmt.Errorf("store blob: no blob ID in response")
+}
+
+type serverError struct {
+	status int
+	body   string
+}
+
+func (e *serverError) Error() string {
+	return fmt.Sprintf("store blob: status %d: %s", e.status, e.body)
+}
+
+// isTransient returns true for network errors and 5xx server errors that are worth retrying.
+func isTransient(err error) bool {
+	var se *serverError
+	if errors.As(err, &se) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return true
+	}
+	if errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNREFUSED) {
+		return true
+	}
+	return false
 }
 
 // BlobURL returns the aggregator URL for a given blob ID.

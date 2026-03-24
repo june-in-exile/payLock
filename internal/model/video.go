@@ -151,7 +151,7 @@ func (s *VideoStore) SetReady(id, thumbnailBlobID, thumbnailBlobURL, previewBlob
 	}
 }
 
-func (s *VideoStore) SetSuiObjectID(id, suiObjectID string) bool {
+func (s *VideoStore) SetSuiObjectID(id, suiObjectID, fullBlobID, fullBlobURL string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	v, ok := s.videos[id]
@@ -159,6 +159,10 @@ func (s *VideoStore) SetSuiObjectID(id, suiObjectID string) bool {
 		return false
 	}
 	v.SuiObjectID = suiObjectID
+	if fullBlobID != "" {
+		v.FullBlobID = fullBlobID
+		v.FullBlobURL = fullBlobURL
+	}
 	s.persist()
 	return true
 }

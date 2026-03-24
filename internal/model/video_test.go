@@ -84,7 +84,7 @@ func TestVideoStore_SetSuiObjectID(t *testing.T) {
 	store := newTestStore(t)
 	store.Create("test-1", "My Video", 0, "")
 
-	ok := store.SetSuiObjectID("test-1", "0xABC123")
+	ok := store.SetSuiObjectID("test-1", "0xABC123", "", "")
 	if !ok {
 		t.Fatal("expected SetSuiObjectID to return true")
 	}
@@ -98,7 +98,7 @@ func TestVideoStore_SetSuiObjectID(t *testing.T) {
 func TestVideoStore_SetSuiObjectID_NotFound(t *testing.T) {
 	store := newTestStore(t)
 
-	ok := store.SetSuiObjectID("nonexistent", "0xABC")
+	ok := store.SetSuiObjectID("nonexistent", "0xABC", "", "")
 	if ok {
 		t.Fatal("expected SetSuiObjectID to return false for nonexistent")
 	}

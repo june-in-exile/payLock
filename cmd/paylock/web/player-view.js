@@ -182,8 +182,8 @@ export function PlayerView() {
       return;
     }
 
-    // Paid video with wallet connected: try auto-decrypt
-    if (video.price > 0 && video.encrypted && video.sui_object_id && video.full_blob_url && wallet.connected) {
+    // Paid video with wallet connected: try auto-decrypt (recover full_blob_url from chain if missing)
+    if (video.price > 0 && video.encrypted && video.sui_object_id && wallet.connected) {
       tryAutoDecrypt(video, el);
       return;
     }
@@ -197,6 +197,19 @@ export function PlayerView() {
       const mod = await loadWallet();
       const passId = await mod.findAccessPass(v.sui_object_id);
       if (!passId) { playPreview(v, el); return; }
+
+      // Recover full_blob_url from chain if missing
+      if (!v.full_blob_url) {
+        setStreamUrl('Recovering blob ID from chain...');
+        await mod.recoverFullBlobId(v);
+        const res = await fetch('/api/status/' + encodeURIComponent(v.id));
+        if (!res.ok) { playPreview(v, el); return; }
+        v = await res.json();
+        setVideo(v);
+      }
+
+      if (!v.full_blob_url) { playPreview(v, el); return; }
+
       setStreamUrl('Decrypting full video...');
       const blobUrl = await mod.decryptVideo(v);
       revokeOldBlob(el);
@@ -255,6 +268,24 @@ export function PlayerView() {
       if (!accessPassId) {
         setPurchaseText('Purchasing...');
         accessPassId = await mod.purchaseVideo(video);
+      }
+
+      if (!video.full_blob_url && video.sui_object_id) {
+        setPurchaseText('Recovering blob ID from chain...');
+        try {
+          const fullBlobId = await mod.recoverFullBlobId(video);
+          const res = await fetch('/api/status/' + encodeURIComponent(video.id));
+          if (res.ok) {
+            const refreshed = await res.json();
+            setVideo(refreshed);
+            video = refreshed;
+          }
+        } catch (recoverErr) {
+          setHint('Recovery failed: ' + recoverErr.message);
+          setPurchasing(false);
+          setPurchaseText('Purchase & Unlock');
+          return;
+        }
       }
 
       if (!video.full_blob_url) {
