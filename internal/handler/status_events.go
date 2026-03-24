@@ -25,6 +25,9 @@ func (h *StatusEvents) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	video, ok := h.videos.Get(id)
 	if !ok {
+		video, ok = h.videos.GetBySuiObjectID(id)
+	}
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}

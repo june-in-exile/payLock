@@ -19,9 +19,17 @@ export async function deleteVideo(id, onDeleted) {
   }
 }
 
-export function VideoCard({ video, showDelete, onDeleted }) {
+export function VideoCard({ video, showDelete, onDeleted, accessState }) {
   const safeStatus = ['ready', 'processing', 'failed'].includes(video.status) ? video.status : 'failed';
   const isPaid = video.price > 0;
+  const safeAccess = ['locked', 'unlocked', 'checking'].includes(accessState) ? accessState : null;
+  const accessLabel = safeAccess === 'checking'
+    ? 'Checking'
+    : safeAccess === 'unlocked'
+      ? 'Unlocked'
+      : safeAccess === 'locked'
+        ? 'Locked'
+        : '';
 
   return html`
     <div class="video-card">
@@ -44,6 +52,9 @@ export function VideoCard({ video, showDelete, onDeleted }) {
           <span class=${isPaid ? 'price-badge paid' : 'price-badge free'}>
             ${isPaid ? formatSui(video.price) + ' SUI' : 'Free'}
           </span>
+          ${isPaid && safeAccess && html`
+            <span class=${'access-badge ' + safeAccess}>${accessLabel}</span>
+          `}
           <span>${formatDate(video.created_at)}</span>
         </div>
       </div>

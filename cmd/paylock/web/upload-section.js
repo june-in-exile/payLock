@@ -176,7 +176,6 @@ async function confirmUpload(fileInput) {
   const file = staged.file;
   const fileArrayBuffer = priceMist > 0 ? await file.arrayBuffer() : null;
 
-  clearStagedFile();
   uploadState.value = { active: true, percent: 0, text: 'Uploading ' + file.name + '...', step: null, showSpinner: false, showSteps: false };
 
   const formData = new FormData();
@@ -189,9 +188,6 @@ async function confirmUpload(fileInput) {
 
   try {
     const data = await sendUpload(formData, file.name);
-    if (fileInput) fileInput.value = '';
-    document.getElementById('video-title').value = '';
-    document.getElementById('video-price').value = '';
 
     let navigateId = data.id;
 
@@ -220,6 +216,10 @@ async function confirmUpload(fileInput) {
       if (video.sui_object_id) navigateId = video.sui_object_id;
     }
 
+    clearStagedFile();
+    if (fileInput) fileInput.value = '';
+    document.getElementById('video-title').value = '';
+    document.getElementById('video-price').value = '';
     uploadState.value = { active: false, percent: 0, text: '', step: null, showSpinner: false, showSteps: false };
     showToast('success', 'Upload complete!');
     navigate('player', { id: navigateId });
@@ -254,13 +254,13 @@ export function UploadSection() {
           Video Title (optional)
         </label>
         <input type="text" id="video-title" placeholder="Enter video title"
-          style="width: 100%; padding: 0.6rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem; margin-bottom: 0.75rem;" />
+          class="form-input" style="margin-bottom: 0.75rem;" />
 
         <label for="video-price" style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
           Price in SUI (0 = free)
         </label>
         <input type="number" id="video-price" placeholder="0" min="0" step="0.01"
-          style="width: 100%; padding: 0.6rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem; margin-bottom: 1rem;" />
+          class="form-input" style="margin-bottom: 1rem;" />
 
         <${StagedFilePreview} inputRef=${inputRef} />
 

@@ -1,7 +1,7 @@
 import { html, useState, useEffect, useRef } from './lib.js';
 import {
   viewParams, navGeneration, currentVideo, walletState,
-  navigate, showToast, formatSui, loadWallet, setPollCleanup,
+  navigate, formatSui, loadWallet, setPollCleanup,
 } from './state.js';
 
 function ChainStatus({ video }) {
@@ -84,9 +84,9 @@ export function PlayerView() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [showLoading, setShowLoading] = useState(false);
   const [hint, setHint] = useState('');
-  const [streamUrl, setStreamUrl] = useState('');
   const [purchaseText, setPurchaseText] = useState('Purchase & Unlock');
   const [purchasing, setPurchasing] = useState(false);
+  const [hasAccess, setHasAccess] = useState(false);
   const videoRef = useRef(null);
 
   // Load video status
@@ -179,7 +179,6 @@ export function PlayerView() {
 
     // Free video: play full blob directly
     if (video.price === 0 && video.full_blob_url) {
-      setStreamUrl(video.full_blob_url);
       el.src = video.full_blob_url;
       el.play().catch(() => {});
       return;
@@ -199,6 +198,39 @@ export function PlayerView() {
     return v.creator && wallet.address && v.creator === wallet.address;
   }
 
+  // Check access pass when wallet/video changes
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkAccess() {
+      if (!video || video.price === 0 || !video.sui_object_id || !wallet.connected) {
+        if (!cancelled) setHasAccess(false);
+        return;
+      }
+      if (isOwner(video)) {
+        if (!cancelled) setHasAccess(true);
+        return;
+      }
+      try {
+        const mod = await loadWallet();
+        const passId = await mod.findAccessPass(video.sui_object_id);
+        if (!cancelled) setHasAccess(!!passId);
+      } catch (_) {
+        if (!cancelled) setHasAccess(false);
+      }
+    }
+
+    checkAccess();
+    return () => { cancelled = true; };
+  }, [video, wallet.connected, wallet.address]);
+
+  // Keep purchase text aligned with access state when idle
+  useEffect(() => {
+    if (purchasing) return;
+    if (hasAccess) setPurchaseText('Unlock');
+    else setPurchaseText('Purchase & Unlock');
+  }, [hasAccess, purchasing]);
+
   async function tryAutoDecrypt(v, el) {
     try {
       const mod = await loadWallet();
@@ -207,11 +239,11 @@ export function PlayerView() {
       if (!ownerMode) {
         const passId = await mod.findAccessPass(v.sui_object_id);
         if (!passId) { playPreview(v, el); return; }
+        setHasAccess(true);
       }
 
       // Recover full_blob_url from chain if missing
       if (!v.full_blob_url) {
-        setStreamUrl('Recovering blob ID from chain...');
         await mod.recoverFullBlobId(v);
         const res = await fetch('/api/status/' + encodeURIComponent(v.id));
         if (!res.ok) { playPreview(v, el); return; }
@@ -221,14 +253,12 @@ export function PlayerView() {
 
       if (!v.full_blob_url) { playPreview(v, el); return; }
 
-      setStreamUrl('Decrypting full video...');
       const blobUrl = ownerMode
         ? await mod.decryptVideoAsOwner(v)
         : await mod.decryptVideo(v);
       revokeOldBlob(el);
       el.onended = null;
       setShowPaywall(false);
-      setStreamUrl(blobUrl);
       el.src = blobUrl;
       el.play().catch(() => {});
     } catch (err) {
@@ -239,7 +269,6 @@ export function PlayerView() {
 
   function playPreview(v, el) {
     if (v.preview_blob_url) {
-      setStreamUrl(v.preview_blob_url);
       el.src = v.preview_blob_url;
       el.play().catch(() => {});
     }
@@ -249,6 +278,7 @@ export function PlayerView() {
         if (!wallet.connected) setHint('Connect wallet to purchase');
         else if (!v.sui_object_id) setHint('Video not yet published on-chain');
         else if (isOwner(v)) { setHint('You own this video'); setPurchaseText('Unlock'); }
+        else if (hasAccess) { setHint('Access pass found'); setPurchaseText('Unlock'); }
         else setHint('');
       };
     }
@@ -288,6 +318,7 @@ export function PlayerView() {
           accessPassId = await mod.purchaseVideo(video);
         }
       }
+      if (accessPassId || ownerMode) setHasAccess(true);
 
       if (!video.full_blob_url && video.sui_object_id) {
         setPurchaseText('Recovering blob ID from chain...');
@@ -322,20 +353,14 @@ export function PlayerView() {
       revokeOldBlob(el);
       el.onended = null;
       setShowPaywall(false);
-      setStreamUrl(blobUrl);
       el.src = blobUrl;
       el.play().catch(() => {});
+      setPurchasing(false);
     } catch (err) {
       setPurchasing(false);
       setPurchaseText('Purchase & Unlock');
       setHint('Failed: ' + err.message);
     }
-  }
-
-  function copyUrl() {
-    navigator.clipboard.writeText(streamUrl).then(() => {
-      showToast('success', 'Copied!');
-    });
   }
 
   const safeStatus = ['ready', 'processing', 'failed'].includes(status) ? status : 'failed';
@@ -373,13 +398,30 @@ export function PlayerView() {
           />
         `}
 
+        ${!showPaywall && !showLoading && video && video.price > 0
+          && video.sui_object_id && status === 'ready' && !isOwner(video) && !hasAccess && html`
+          <button
+            class="btn early-purchase-btn"
+            disabled=${purchasing}
+            onclick=${handlePurchase}
+          >
+            ${purchasing ? purchaseText : `Purchase ${formatSui(video.price)} SUI`}
+          </button>
+        `}
+
         ${video && html`<${ChainStatus} video=${video} />`}
       </div>
 
-      <div class="stream-url">${streamUrl || statusText}</div>
+      ${statusText && html`
+        <div style="font-size: 0.85rem; color: var(--text-muted); background: var(--surface); padding: 0.6rem 0.8rem; border-radius: 6px; margin-bottom: 1rem; border: 1px solid var(--border);">
+          ${statusText}
+        </div>
+      `}
+
       <div class="player-actions">
-        <button class="btn btn-sm btn-outline" onclick=${copyUrl}>Copy URL</button>
-        <button class="btn btn-sm btn-danger" onclick=${() => params.id && deleteVideo(params.id)}>Delete</button>
+        ${video && isOwner(video) && html`
+          <button class="btn btn-sm btn-danger" onclick=${() => params.id && deleteVideo(params.id)}>Delete</button>
+        `}
       </div>
     </div>
   `;

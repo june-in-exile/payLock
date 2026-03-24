@@ -314,9 +314,11 @@ export async function createVideoOnChain(videoId, price, previewBlobId, fullBlob
 
   const suiObjectId = created.objectId;
 
+  const putHeaders = { 'Content-Type': 'application/json' };
+  if (connectedAccount) putHeaders['X-Creator'] = connectedAccount.address;
   const res = await fetch('/api/videos/' + encodeURIComponent(videoId) + '/sui-object', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: putHeaders,
     body: JSON.stringify({ sui_object_id: suiObjectId, full_blob_id: fullBlobId }),
   });
   if (!res.ok) {
@@ -575,9 +577,11 @@ export async function recoverFullBlobId(video) {
 
   const fullBlobId = fields.full_blob_id;
 
+  const recoverHeaders = { 'Content-Type': 'application/json' };
+  if (connectedAccount) recoverHeaders['X-Creator'] = connectedAccount.address;
   const res = await fetch('/api/videos/' + encodeURIComponent(video.id) + '/sui-object', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: recoverHeaders,
     body: JSON.stringify({ sui_object_id: video.sui_object_id, full_blob_id: fullBlobId }),
   });
   if (!res.ok) {

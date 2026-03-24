@@ -25,6 +25,9 @@ func (h *Status) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	video, ok := h.videos.Get(id)
 	if !ok {
+		video, ok = h.videos.GetBySuiObjectID(id)
+	}
+	if !ok {
 		writeJSON(w, http.StatusNotFound, map[string]string{
 			"error": "video not found",
 		})
