@@ -37,7 +37,7 @@ PayLock is a video upload service that stores video files on Walrus decentralize
 ```
 cmd/paylock/main.go          — wires all packages; route groups:
                             POST /api/upload, GET /api/status/{id}
-                            GET /api/videos, GET /api/videos/by-object/{object_id}
+                            GET /api/videos
                             DELETE /api/videos/{id}
                             PUT /api/videos/{id}, GET /api/config
                             POST /api/reindex

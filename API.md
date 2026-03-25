@@ -20,13 +20,12 @@
     - [2. 查詢影片狀態](#2-查詢影片狀態)
     - [3. 即時狀態追蹤 (SSE)](#3-即時狀態追蹤-sse)
     - [4. 關聯鏈上物件](#4-關聯鏈上物件)
-    - [5. 以鏈上物件 ID 查詢影片](#5-以鏈上物件-id-查詢影片)
-    - [6. 列出所有影片](#6-列出所有影片)
-    - [7. 刪除影片](#7-刪除影片)
-    - [8. 預覽串流](#8-預覽串流)
-    - [9. 完整版串流](#9-完整版串流)
-    - [10. 系統配置](#10-系統配置)
-    - [11. 手動重新索引](#11-手動重新索引)
+    - [5. 列出所有影片](#5-列出所有影片)
+    - [6. 刪除影片](#6-刪除影片)
+    - [7. 預覽串流](#7-預覽串流)
+    - [8. 完整版串流](#8-完整版串流)
+    - [9. 系統配置](#9-系統配置)
+    - [10. 手動重新索引](#10-手動重新索引)
   - [付費解鎖整合指南](#付費解鎖整合指南)
     - [前置準備](#前置準備)
     - [創作者端流程](#創作者端流程)
@@ -157,7 +156,7 @@ POST /api/upload (price>0)
 
 **`GET /api/status/{id}`**
 
-取得特定影片的完整 Metadata。
+取得特定影片的完整 Metadata。`{id}` 可以是 `paylock_id` 或 `sui_object_id`，系統會自動辨識。
 
 **成功回應** (`200 OK`): 回傳完整 Video 物件（見上方欄位定義）。
 
@@ -228,24 +227,7 @@ data: {"id":"...","status":"ready","preview_blob_id":"...","preview_blob_url":".
 
 ---
 
-### 5. 以鏈上物件 ID 查詢影片
-
-**`GET /api/videos/by-object/{object_id}`**
-
-以 Sui 鏈上的 `sui_object_id` 查詢對應的影片 Metadata。
-
-**成功回應** (`200 OK`): 回傳完整 Video 物件（見上方欄位定義）。
-
-**錯誤回應**:
-
-| Status | 原因            |
-|--------|-----------------|
-| `400`  | 缺少 object_id  |
-| `404`  | 影片不存在      |
-
----
-
-### 6. 列出所有影片
+### 5. 列出所有影片
 
 **`GET /api/videos`**
 
@@ -275,7 +257,7 @@ data: {"id":"...","status":"ready","preview_blob_id":"...","preview_blob_url":".
 
 ---
 
-### 7. 刪除影片
+### 6. 刪除影片
 
 **`DELETE /api/videos/{id}`**
 
@@ -300,7 +282,7 @@ data: {"id":"...","status":"ready","preview_blob_id":"...","preview_blob_url":".
 
 ---
 
-### 8. 預覽串流
+### 7. 預覽串流
 
 **`GET /stream/{id}/preview`**
 
@@ -323,7 +305,7 @@ data: {"id":"...","status":"ready","preview_blob_id":"...","preview_blob_url":".
 
 ---
 
-### 9. 完整版串流
+### 8. 完整版串流
 
 **`GET /stream/{id}/full`**
 
@@ -333,7 +315,7 @@ data: {"id":"...","status":"ready","preview_blob_id":"...","preview_blob_url":".
 
 ---
 
-### 10. 系統配置
+### 9. 系統配置
 
 **`GET /api/config`**
 
@@ -352,7 +334,7 @@ data: {"id":"...","status":"ready","preview_blob_id":"...","preview_blob_url":".
 
 ---
 
-### 11. 手動重新索引
+### 10. 手動重新索引
 
 **`POST /api/reindex`**
 
@@ -522,8 +504,8 @@ await fetch(`/api/videos/${paylockId}`, {
 const listRes = await fetch('/api/videos?page=1&per_page=20');
 const { videos, total } = await listRes.json();
 
-// 以鏈上物件 ID 查詢單一影片
-const videoRes = await fetch(`/api/videos/by-object/${suiObjectId}`);
+// 以鏈上物件 ID 查詢單一影片（也可用 paylock_id）
+const videoRes = await fetch(`/api/status/${suiObjectId}`);
 const video = await videoRes.json();
 // → { price, encrypted, preview_blob_url, full_blob_url, sui_object_id, ... }
 ```

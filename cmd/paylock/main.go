@@ -85,7 +85,6 @@ func main() {
 	mux.Handle("GET /api/status/{id}", handler.NewStatus(videos))
 	mux.Handle("GET /api/status/{id}/events", handler.NewStatusEvents(videos))
 	mux.Handle("GET /api/videos", handler.NewVideos(videos))
-	mux.Handle("GET /api/videos/by-object/{object_id}", handler.NewVideoByObject(videos))
 	mux.Handle("DELETE /api/videos/{id}", handler.NewDelete(videos, sigVerifier, clock))
 	mux.Handle("PUT /api/videos/{id}", handler.NewSetSuiObject(videos, wc, sigVerifier, clock))
 	mux.Handle("GET /api/config", handler.NewAppConfig(cfg))
