@@ -152,6 +152,92 @@ function pollUntilReady(id) {
   });
 }
 
+let previewDurationSec = 10;
+
+async function fetchPreviewDuration() {
+  try {
+    const res = await fetch('/api/config');
+    if (res.ok) {
+      const cfg = await res.json();
+      if (cfg.preview_duration > 0) previewDurationSec = cfg.preview_duration;
+    }
+  } catch (_) {
+    // fallback to default
+  }
+}
+
+fetchPreviewDuration();
+
+function generatePreview(file) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+
+    const objectUrl = URL.createObjectURL(file);
+    video.src = objectUrl;
+
+    const cleanup = () => URL.revokeObjectURL(objectUrl);
+
+    video.addEventListener('error', () => {
+      cleanup();
+      reject(new Error('Failed to load video for preview generation'));
+    });
+
+    video.addEventListener('loadedmetadata', () => {
+      const clipDuration = Math.min(video.duration, previewDurationSec);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+
+      const stream = canvas.captureStream();
+      const audioTracks = video.captureStream ? video.captureStream().getAudioTracks() : [];
+      for (const track of audioTracks) stream.addTrack(track);
+
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+        ? 'video/webm;codecs=vp9,opus'
+        : 'video/webm';
+      const recorder = new MediaRecorder(stream, { mimeType });
+      const chunks = [];
+
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+
+      recorder.onstop = () => {
+        cleanup();
+        const blob = new Blob(chunks, { type: mimeType });
+        const previewFile = new File([blob], 'preview.webm', { type: mimeType });
+        resolve(previewFile);
+      };
+
+      recorder.onerror = () => {
+        cleanup();
+        reject(new Error('Preview recording failed'));
+      };
+
+      video.addEventListener('seeked', () => {
+        video.play();
+        recorder.start();
+
+        const drawFrame = () => {
+          if (video.currentTime >= clipDuration || video.ended) {
+            recorder.stop();
+            video.pause();
+            return;
+          }
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          requestAnimationFrame(drawFrame);
+        };
+        requestAnimationFrame(drawFrame);
+      }, { once: true });
+
+      video.currentTime = 0;
+    });
+  });
+}
+
 function pollFallback(id) {
   return new Promise((resolve, reject) => {
     const interval = setInterval(async () => {
@@ -183,10 +269,22 @@ async function confirmUpload(fileInput) {
   const file = staged.file;
   const fileArrayBuffer = priceMist > 0 ? await file.arrayBuffer() : null;
 
+  let previewFile = null;
+  if (priceMist > 0) {
+    uploadState.value = { active: true, percent: 0, text: 'Generating preview clip...', step: null, showSpinner: true, showSteps: false };
+    try {
+      previewFile = await generatePreview(file);
+    } catch (err) {
+      uploadState.value = { active: false, percent: 0, text: '', step: null, showSpinner: false, showSteps: false };
+      showToast('error', 'Failed to generate preview: ' + err.message, 5000);
+      return;
+    }
+  }
+
   uploadState.value = { active: true, percent: 0, text: 'Uploading ' + file.name + '...', step: null, showSpinner: false, showSteps: false };
 
   const formData = new FormData();
-  formData.append(priceMist > 0 ? 'preview' : 'video', file);
+  formData.append(priceMist > 0 ? 'preview' : 'video', previewFile || file);
   const title = document.getElementById('video-title').value;
   if (title) formData.append('title', title);
   if (priceMist > 0) formData.append('price', priceMist.toString());

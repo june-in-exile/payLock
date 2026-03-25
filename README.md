@@ -21,9 +21,10 @@ PayLock is a video paywall SDK built on Walrus + Seal. When a video is uploaded,
 
 To balance security and performance, PayLock uses a hybrid flow of "backend preprocessing + frontend encryption":
 
-1. **Backend Preprocessing**:
-   - User uploads video to `POST /api/upload`.
-   - Backend generates thumbnail and preview MP4, then uploads them to Walrus.
+1. **Frontend Preview Generation + Backend Upload**:
+   - Frontend generates a short preview clip (default 10s) using `MediaRecorder` (canvas + `captureStream`). External integrators can alternatively use `ffmpeg.wasm`.
+   - Frontend uploads the preview (+ optional thumbnail) to `POST /api/upload`.
+   - Backend validates the preview duration via `ffprobe` (if FFmpeg is available) against `PAYLOCK_MAX_PREVIEW_DURATION` (default 30s), then uploads to Walrus.
    - Notifies the frontend via `GET /api/status/{id}/events` (SSE) when the preview is ready.
 
 2. **Frontend Encryption & Upload**:
@@ -144,7 +145,6 @@ For the full paid video integration flow, see [API.md — Paid Video Integration
 | `PAYLOCK_WALRUS_PUBLISHER_URL` | `...` | Walrus Publisher |
 | `PAYLOCK_WALRUS_AGGREGATOR_URL` | `...` | Walrus Aggregator |
 | `PAYLOCK_WALRUS_EPOCHS` | `5` | Walrus storage epochs |
-| `PAYLOCK_PREVIEW_DURATION` | `10` | Preview clip duration in seconds |
 | `PAYLOCK_SUI_RPC_URL` | `...` | Sui RPC (Testnet) |
 | `PAYLOCK_GATING_PACKAGE_ID` | _(required)_ | Deployed contract Package ID |
 

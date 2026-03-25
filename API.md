@@ -46,7 +46,7 @@ All endpoint paths are relative to the Base URL, e.g. `POST https://paylock.up.r
       - [Install Dependencies](#install-dependencies)
       - [Initialize SDKs](#initialize-sdks)
     - [Creator Flow](#creator-flow)
-      - [Step 1: Generate Preview & Upload](#step-1-generate-preview--upload)
+      - [Step 1: Generate Preview \& Upload](#step-1-generate-preview--upload)
       - [Step 2: Wait for Server Processing](#step-2-wait-for-server-processing)
       - [Step 3: Encrypt Full Video \& Publish On-Chain](#step-3-encrypt-full-video--publish-on-chain)
       - [Step 4: Write Back to API](#step-4-write-back-to-api)
@@ -254,7 +254,7 @@ Initiate an async upload. The server validates the file and starts background pr
 
 > **Paid uploads require Wallet Signature authentication** (`action=upload`). See [Authentication](#authentication).
 >
-> **Preview generation is client-side**: The full unencrypted video is never sent to the server. The frontend must generate the preview clip (e.g., first 10 seconds via `ffmpeg.wasm`) and send only the preview. If FFmpeg is available on the server, the preview duration is validated against `PAYLOCK_MAX_PREVIEW_DURATION` (default 30 seconds).
+> **Preview generation is client-side**: The full unencrypted video is never sent to the server. The frontend must generate a short preview clip and send only the preview. The built-in SPA uses `MediaRecorder` (canvas + `captureStream`) to capture the first N seconds (default 10s, exposed at `GET /api/config` as `preview_duration`). External integrators can also use `ffmpeg.wasm`. If FFmpeg is available on the server, the preview duration is validated against `PAYLOCK_MAX_PREVIEW_DURATION` (default 30 seconds).
 
 **Success Response** (`202 Accepted`):
 
@@ -451,7 +451,8 @@ Get backend environment configuration. Integrators should use this API to get co
   "gating_package_id": "0x...",
   "sui_network": "testnet",
   "walrus_publisher_url": "https://publisher.walrus-testnet.walrus.space",
-  "walrus_aggregator_url": "https://aggregator.walrus-testnet.walrus.space"
+  "walrus_aggregator_url": "https://aggregator.walrus-testnet.walrus.space",
+  "preview_duration": 10
 }
 ```
 
@@ -548,14 +549,23 @@ For paid videos, the frontend generates a short preview clip and optional thumbn
 > **Paid videos require Wallet Signature authentication**. See [Authentication](#authentication).
 
 ```js
+// 1a. Get preview duration from server config
+const configRes = await fetch(`${PAYLOCK}/api/config`);
+const config = await configRes.json();
+const previewDuration = config.preview_duration || 10; // seconds
+
+// 1b. Generate preview clip — Option A: MediaRecorder (no dependencies, built-in SPA approach)
+//     Records the first N seconds via canvas.captureStream() → outputs WebM.
+//     See upload-section.js generatePreview() for full implementation.
+
+// 1b. Generate preview clip — Option B: ffmpeg.wasm (outputs MP4, better codec control)
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 
-// 1a. Generate preview clip (first 10 seconds) using ffmpeg.wasm
 const ffmpeg = new FFmpeg();
 await ffmpeg.load();
 await ffmpeg.writeFile('input.mp4', await fetchFile(videoFile));
-await ffmpeg.exec(['-i', 'input.mp4', '-t', '10', '-c', 'copy', '-movflags', '+faststart', 'preview.mp4']);
+await ffmpeg.exec(['-i', 'input.mp4', '-t', String(previewDuration), '-c', 'copy', '-movflags', '+faststart', 'preview.mp4']);
 const previewData = await ffmpeg.readFile('preview.mp4');
 const previewBlob = new Blob([previewData], { type: 'video/mp4' });
 

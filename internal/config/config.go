@@ -63,14 +63,6 @@ func Load() (*Config, error) {
 		cfg.WalrusEpochs = epochs
 	}
 
-	if v := os.Getenv("PAYLOCK_PREVIEW_DURATION"); v != "" {
-		dur, err := strconv.Atoi(v)
-		if err != nil {
-			return nil, fmt.Errorf("invalid PAYLOCK_PREVIEW_DURATION: %w", err)
-		}
-		cfg.PreviewDuration = dur
-	}
-
 	if v := os.Getenv("PAYLOCK_MAX_PREVIEW_SIZE_MB"); v != "" {
 		mb, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
