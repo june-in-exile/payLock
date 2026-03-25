@@ -148,6 +148,26 @@ func ExtractThumbnail(data []byte, ffmpegPath string) ([]byte, error) {
 	return thumbData, nil
 }
 
+// ValidatePreviewDuration checks that the video data is not longer than maxSec seconds.
+// Uses ffprobe to determine duration. Returns nil if within limit.
+func ValidatePreviewDuration(data []byte, maxSec int, ffprobePath string) error {
+	inputFile, err := writeTempInput(data)
+	if err != nil {
+		return fmt.Errorf("prepare preview for duration check: %w", err)
+	}
+	defer removeTempFile(inputFile)
+
+	duration, err := ProbeFile(inputFile, ffprobePath)
+	if err != nil {
+		return fmt.Errorf("probe preview duration: %w", err)
+	}
+
+	if duration > float64(maxSec) {
+		return fmt.Errorf("preview too long: %.0fs (max %ds)", duration, maxSec)
+	}
+	return nil
+}
+
 func EnsureFaststart(data []byte, ffmpegPath string) ([]byte, error) {
 	inputFile, err := writeTempInput(data)
 	if err != nil {

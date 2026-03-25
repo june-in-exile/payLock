@@ -98,6 +98,27 @@ func TestValidateMagicBytes_TooSmall(t *testing.T) {
 	}
 }
 
+func TestValidateJPEGMagicBytes_Valid(t *testing.T) {
+	data := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10}
+	if err := ValidateJPEGMagicBytes(bytes.NewReader(data)); err != nil {
+		t.Errorf("expected valid JPEG, got error: %v", err)
+	}
+}
+
+func TestValidateJPEGMagicBytes_Invalid(t *testing.T) {
+	data := []byte{0x89, 0x50, 0x4E, 0x47} // PNG header
+	if err := ValidateJPEGMagicBytes(bytes.NewReader(data)); err != ErrInvalidThumbnailFormat {
+		t.Errorf("expected ErrInvalidThumbnailFormat, got: %v", err)
+	}
+}
+
+func TestValidateJPEGMagicBytes_TooSmall(t *testing.T) {
+	data := []byte{0xFF, 0xD8}
+	if err := ValidateJPEGMagicBytes(bytes.NewReader(data)); err != ErrInvalidThumbnailFormat {
+		t.Errorf("expected ErrInvalidThumbnailFormat for short input, got: %v", err)
+	}
+}
+
 func TestValidateSize_OK(t *testing.T) {
 	err := ValidateSize(100, 500)
 	if err != nil {

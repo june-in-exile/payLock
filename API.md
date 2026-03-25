@@ -26,6 +26,9 @@ All endpoint paths are relative to the Base URL, e.g. `POST https://paylock.up.r
     - [Video Object Fields](#video-object-fields)
     - [Error Response Format](#error-response-format)
     - [Authentication](#authentication)
+      - [1. Wallet Signature (Creator Operations)](#1-wallet-signature-creator-operations)
+      - [2. Admin Secret (Admin Operations)](#2-admin-secret-admin-operations)
+      - [Authentication Overview](#authentication-overview)
     - [CORS](#cors)
   - [API Endpoints](#api-endpoints)
     - [1. Upload Video](#1-upload-video)
@@ -40,18 +43,27 @@ All endpoint paths are relative to the Base URL, e.g. `POST https://paylock.up.r
     - [10. Manual Reindex](#10-manual-reindex)
   - [Paid Video Integration Guide](#paid-video-integration-guide)
     - [Prerequisites](#prerequisites)
+      - [Install Dependencies](#install-dependencies)
+      - [Initialize SDKs](#initialize-sdks)
     - [Creator Flow](#creator-flow)
-      - [Step 1: Upload Video](#step-1-upload-video)
+      - [Step 1: Generate Preview & Upload](#step-1-generate-preview--upload)
       - [Step 2: Wait for Server Processing](#step-2-wait-for-server-processing)
-      - [Step 3: Encrypt Full Video & Publish On-Chain](#step-3-encrypt-full-video--publish-on-chain)
+      - [Step 3: Encrypt Full Video \& Publish On-Chain](#step-3-encrypt-full-video--publish-on-chain)
       - [Step 4: Write Back to API](#step-4-write-back-to-api)
     - [Viewer Flow](#viewer-flow)
-      - [Step 5: Browse & Discover Videos](#step-5-browse--discover-videos)
+      - [Step 5: Browse \& Discover Videos](#step-5-browse--discover-videos)
       - [Step 6: Preview Playback](#step-6-preview-playback)
-      - [Step 7: Purchase & Decrypt Playback](#step-7-purchase--decrypt-playback)
+      - [Step 7: Purchase \& Decrypt Playback](#step-7-purchase--decrypt-playback)
     - [Integration Summary](#integration-summary)
     - [Move Contract Reference (`paylock::gating`)](#move-contract-reference-paylockgating)
   - [FAQ / Troubleshooting](#faq--troubleshooting)
+    - [ID Detection Logic](#id-detection-logic)
+    - [What Happens When Walrus Blobs Expire?](#what-happens-when-walrus-blobs-expire)
+    - [CORS Errors When Calling `/api/*` from Frontend](#cors-errors-when-calling-api-from-frontend)
+    - [Wallet Signature Verification Failed (403)](#wallet-signature-verification-failed-403)
+    - [Upload Stuck on `processing`](#upload-stuck-on-processing)
+    - [How to Check if a User Has Already Purchased a Video?](#how-to-check-if-a-user-has-already-purchased-a-video)
+    - [Related External Documentation](#related-external-documentation)
 
 ---
 
@@ -69,14 +81,17 @@ POST /api/upload (price=0)
 ### Paid Videos
 
 ```text
-POST /api/upload (price>0)
-    → Server processes preview / thumbnail and uploads to Walrus
+Frontend generates preview (ffmpeg.wasm) + thumbnail from original video
+POST /api/upload (price>0, preview + optional thumbnail)
+    → Server validates and uploads preview / thumbnail to Walrus
     → GET /api/status/{id}/events (SSE) wait for status=ready
     → Frontend encrypts original video with Seal SDK → uploads encrypted blob to Walrus → gets full_blob_id
     → Frontend sends Sui transaction calling gating::create_video (with price, preview_blob_id, full_blob_id, seal_namespace)
     → PUT /api/videos/{id} (write back sui_object_id + full_blob_id)
     → Buyer: purchase_and_transfer → seal_approve → Seal decrypt → play
 ```
+
+> **Security**: The full unencrypted video never leaves the user's device. The server only receives the short preview clip.
 
 ---
 
@@ -218,17 +233,28 @@ API endpoints (`/api/*`) do not have CORS enabled. If your frontend needs to cal
 Initiate an async upload. The server validates the file and starts background processing.
 
 - **Content-Type**: `multipart/form-data`
-- **Size limit**: Controlled by `PAYLOCK_MAX_FILE_SIZE_MB` (default 500 MB), returns `413` if exceeded.
 - **Supported formats**: MP4 (`.mp4`), MOV (`.mov`), WebM (`.webm`), MKV (`.mkv`), AVI (`.avi`). Validated by magic bytes, not file extension.
+
+**Free uploads** (`price=0` or omitted):
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `video` | Yes | Video file |
+| `video` | Yes | Video file (max `PAYLOCK_MAX_FILE_SIZE_MB`, default 500 MB) |
 | `title` | No | Video title, auto-generated if not provided |
-| `price` | No | Price (MIST, uint64). `0` or omitted = free video |
-| `creator` | Conditional | Creator's Sui address. Required when `price > 0` |
+| `price` | No | `0` or omitted = free video |
 
-> **Paid upload restriction**: When `price > 0`, `creator` must be provided and the server must have FFmpeg enabled (`PAYLOCK_ENABLE_FFMPEG=true`), otherwise returns `400`.
+**Paid uploads** (`price > 0`):
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `preview` | Yes | Short preview video clip generated client-side (max `PAYLOCK_MAX_PREVIEW_SIZE_MB`, default 50 MB) |
+| `thumbnail` | No | JPEG thumbnail image generated client-side |
+| `title` | No | Video title, auto-generated if not provided |
+| `price` | Yes | Price in MIST (uint64, must be > 0) |
+
+> **Paid uploads require Wallet Signature authentication** (`action=upload`). See [Authentication](#authentication).
+>
+> **Preview generation is client-side**: The full unencrypted video is never sent to the server. The frontend must generate the preview clip (e.g., first 10 seconds via `ffmpeg.wasm`) and send only the preview. If FFmpeg is available on the server, the preview duration is validated against `PAYLOCK_MAX_PREVIEW_DURATION` (default 30 seconds).
 
 **Success Response** (`202 Accepted`):
 
@@ -243,7 +269,8 @@ Initiate an async upload. The server validates the file and starts background pr
 
 | Status | Reason |
 |--------|--------|
-| `400` | Cannot read file / unsupported format / price not a positive integer / paid upload missing creator / paid upload but FFmpeg not enabled |
+| `400` | Cannot read file / unsupported format / price not a positive integer / missing `preview` field for paid upload / invalid thumbnail format |
+| `401` | Missing or invalid wallet signature (paid uploads) |
 | `413` | File exceeds size limit |
 
 ---
@@ -514,20 +541,36 @@ const sealClient = new SealClient({
 
 ### Creator Flow
 
-#### Step 1: Upload Video
+#### Step 1: Generate Preview & Upload
 
-Upload a video via `POST /api/upload`. The server automatically processes the preview and thumbnail and uploads them to Walrus.
+For paid videos, the frontend generates a short preview clip and optional thumbnail locally, then uploads only those to the server. The full unencrypted video never leaves the user's device.
 
 > **Paid videos require Wallet Signature authentication**. See [Authentication](#authentication).
 
 ```js
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile } from '@ffmpeg/util';
+
+// 1a. Generate preview clip (first 10 seconds) using ffmpeg.wasm
+const ffmpeg = new FFmpeg();
+await ffmpeg.load();
+await ffmpeg.writeFile('input.mp4', await fetchFile(videoFile));
+await ffmpeg.exec(['-i', 'input.mp4', '-t', '10', '-c', 'copy', '-movflags', '+faststart', 'preview.mp4']);
+const previewData = await ffmpeg.readFile('preview.mp4');
+const previewBlob = new Blob([previewData], { type: 'video/mp4' });
+
+// 1b. (Optional) Generate thumbnail
+await ffmpeg.exec(['-i', 'input.mp4', '-vframes', '1', '-q:v', '2', 'thumb.jpg']);
+const thumbData = await ffmpeg.readFile('thumb.jpg');
+const thumbBlob = new Blob([thumbData], { type: 'image/jpeg' });
+
+// 1c. Upload preview + thumbnail to PayLock
 const form = new FormData();
-form.append('video', videoFile);
+form.append('preview', previewBlob, 'preview.mp4');
+form.append('thumbnail', thumbBlob, 'thumb.jpg');
 form.append('title', 'My Paid Video');
 form.append('price', '1000000000');  // 1 SUI = 10^9 MIST
-form.append('creator', creatorAddress);
 
-// Paid uploads require wallet signature headers
 const timestamp = Math.floor(Date.now() / 1000);
 const message = `paylock:upload::${timestamp}`;
 const msgBytes = new TextEncoder().encode(message);
@@ -546,7 +589,7 @@ const { id: paylockId } = await res.json();
 // → 202 Accepted, { id: "abc123", status: "processing" }
 ```
 
-> **Free videos** (`price=0`): No wallet signature needed. The server processes both preview and full video. Once complete, you can stream directly — Steps 2 & 3 are not needed.
+> **Free videos** (`price=0`): No wallet signature needed. Send the full video in the `video` field instead of `preview`. The server processes preview, thumbnail, and full video. Once complete, you can stream directly — Steps 2 & 3 are not needed.
 
 #### Step 2: Wait for Server Processing
 
@@ -847,7 +890,8 @@ Common causes:
 
 ### Upload Stuck on `processing`
 
-- Verify that the server has FFmpeg enabled (`PAYLOCK_ENABLE_FFMPEG=true`)
+- **Free videos**: Verify that the server has FFmpeg enabled (`PAYLOCK_ENABLE_FFMPEG=true`)
+- **Paid videos**: FFmpeg is not required on the server (preview is generated client-side). If FFmpeg is available, the server validates the preview duration — check the `error` field for "preview too long" messages
 - Check that the Walrus Publisher is reachable
 - Use SSE (`/api/status/{id}/events`) to monitor — if `status=failed` is received, the `error` field explains the reason
 

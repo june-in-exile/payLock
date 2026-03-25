@@ -9,27 +9,31 @@ import (
 )
 
 type Config struct {
-	Port             string
-	MaxFileSize      int64
-	WalrusPublisher  string
-	WalrusAggregator string
-	WalrusEpochs     int
-	FFmpegEnabled    bool
-	FFmpegPath       string
-	FFprobePath      string
-	PreviewDuration  int
-	SuiRPCURL        string
-	GatingPackageID  string
-	DataDir          string
-	AdminSecret      string
+	Port               string
+	MaxFileSize        int64
+	MaxPreviewSize     int64
+	MaxPreviewDuration int
+	WalrusPublisher    string
+	WalrusAggregator   string
+	WalrusEpochs       int
+	FFmpegEnabled      bool
+	FFmpegPath         string
+	FFprobePath        string
+	PreviewDuration    int
+	SuiRPCURL          string
+	GatingPackageID    string
+	DataDir            string
+	AdminSecret        string
 }
 
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
 	cfg := &Config{
-		Port:             envOrDefault("PAYLOCK_PORT", "8080"),
-		MaxFileSize:      500 * 1024 * 1024,
+		Port:               envOrDefault("PAYLOCK_PORT", "8080"),
+		MaxFileSize:        500 * 1024 * 1024,
+		MaxPreviewSize:     50 * 1024 * 1024,
+		MaxPreviewDuration: 30,
 		WalrusPublisher:  envOrDefault("PAYLOCK_WALRUS_PUBLISHER_URL", "https://publisher.walrus-testnet.walrus.space"),
 		WalrusAggregator: envOrDefault("PAYLOCK_WALRUS_AGGREGATOR_URL", "https://aggregator.walrus-testnet.walrus.space"),
 		WalrusEpochs:     5,
@@ -65,6 +69,22 @@ func Load() (*Config, error) {
 			return nil, fmt.Errorf("invalid PAYLOCK_PREVIEW_DURATION: %w", err)
 		}
 		cfg.PreviewDuration = dur
+	}
+
+	if v := os.Getenv("PAYLOCK_MAX_PREVIEW_SIZE_MB"); v != "" {
+		mb, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid PAYLOCK_MAX_PREVIEW_SIZE_MB: %w", err)
+		}
+		cfg.MaxPreviewSize = mb * 1024 * 1024
+	}
+
+	if v := os.Getenv("PAYLOCK_MAX_PREVIEW_DURATION"); v != "" {
+		dur, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid PAYLOCK_MAX_PREVIEW_DURATION: %w", err)
+		}
+		cfg.MaxPreviewDuration = dur
 	}
 
 	return cfg, nil

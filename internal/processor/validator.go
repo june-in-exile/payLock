@@ -50,6 +50,21 @@ func ValidateMagicBytes(r io.Reader) error {
 	return ErrInvalidFormat
 }
 
+var ErrInvalidThumbnailFormat = errors.New("invalid thumbnail format: expected JPEG")
+
+// ValidateJPEGMagicBytes checks that the reader starts with JPEG magic bytes (FF D8 FF).
+func ValidateJPEGMagicBytes(r io.Reader) error {
+	header := make([]byte, 3)
+	n, err := io.ReadFull(r, header)
+	if err != nil || n < 3 {
+		return ErrInvalidThumbnailFormat
+	}
+	if header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF {
+		return nil
+	}
+	return ErrInvalidThumbnailFormat
+}
+
 func ValidateSize(size int64, maxSize int64) error {
 	if size > maxSize {
 		return fmt.Errorf("%w: %d bytes (max %d)", ErrFileTooLarge, size, maxSize)

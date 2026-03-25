@@ -35,27 +35,44 @@ func NewUpload(w Storer, videos *model.VideoStore, cfg *config.Config, verifier 
 }
 
 func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Apply the larger limit initially so we can parse the price field.
+	// The paid path re-applies a tighter limit via MaxPreviewSize after branching.
 	r.Body = http.MaxBytesReader(w, r.Body, h.cfg.MaxFileSize)
 
-	data, title, price, err := h.parseRequest(r)
+	price, err := parsePriceField(r)
 	if err != nil {
 		writeJSON(w, err.status, map[string]string{"error": err.msg})
 		return
 	}
 
-	var creator string
 	if price > 0 {
-		auth := extractAndVerifyWalletAuth(r, h.verifier, h.clock, "upload", "")
-		if auth.err != "" {
-			writeJSON(w, auth.status, map[string]string{"error": auth.err})
-			return
-		}
-		creator = auth.address
+		h.handlePaidUpload(w, r, price)
+	} else {
+		h.handleFreeUpload(w, r)
 	}
-	if price > 0 && !h.cfg.FFmpegEnabled {
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": "paid uploads require ffmpeg (set PAYLOCK_ENABLE_FFMPEG=true and install ffmpeg)",
-		})
+}
+
+type requestError struct {
+	status int
+	msg    string
+}
+
+func parsePriceField(r *http.Request) (uint64, *requestError) {
+	v := r.FormValue("price")
+	if v == "" {
+		return 0, nil
+	}
+	price, err := strconv.ParseUint(v, 10, 64)
+	if err != nil {
+		return 0, &requestError{http.StatusBadRequest, "invalid price: must be a positive integer (MIST)"}
+	}
+	return price, nil
+}
+
+func (h *Upload) handleFreeUpload(w http.ResponseWriter, r *http.Request) {
+	data, title, reqErr := h.parseFreeRequest(r)
+	if reqErr != nil {
+		writeJSON(w, reqErr.status, map[string]string{"error": reqErr.msg})
 		return
 	}
 
@@ -64,7 +81,7 @@ func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		title = id
 	}
 
-	h.videos.Create(id, title, price, creator)
+	h.videos.Create(id, title, 0, "")
 
 	go h.processAndUpload(id, data)
 
@@ -74,50 +91,122 @@ func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-type requestError struct {
-	status int
-	msg    string
+func (h *Upload) handlePaidUpload(w http.ResponseWriter, r *http.Request, price uint64) {
+	auth := extractAndVerifyWalletAuth(r, h.verifier, h.clock, "upload", "")
+	if auth.err != "" {
+		writeJSON(w, auth.status, map[string]string{"error": auth.err})
+		return
+	}
+
+	previewData, thumbnailData, title, reqErr := h.parsePaidRequest(r)
+	if reqErr != nil {
+		writeJSON(w, reqErr.status, map[string]string{"error": reqErr.msg})
+		return
+	}
+
+	id := generateID()
+	if title == "" {
+		title = id
+	}
+
+	h.videos.Create(id, title, price, auth.address)
+
+	go h.processAndUploadPaid(id, previewData, thumbnailData)
+
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"id":     id,
+		"status": model.StatusProcessing,
+	})
 }
 
-func (h *Upload) parseRequest(r *http.Request) ([]byte, string, uint64, *requestError) {
+func (h *Upload) parseFreeRequest(r *http.Request) ([]byte, string, *requestError) {
 	file, header, err := r.FormFile("video")
 	if err != nil {
-		return nil, "", 0, &requestError{http.StatusBadRequest, "failed to read video file: " + err.Error()}
+		return nil, "", &requestError{http.StatusBadRequest, "failed to read video file: " + err.Error()}
 	}
 	defer file.Close()
 
 	if err := processor.ValidateSize(header.Size, h.cfg.MaxFileSize); err != nil {
-		return nil, "", 0, &requestError{http.StatusRequestEntityTooLarge, err.Error()}
+		return nil, "", &requestError{http.StatusRequestEntityTooLarge, err.Error()}
 	}
 
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return nil, "", 0, &requestError{http.StatusBadRequest, "failed to read video file"}
+		return nil, "", &requestError{http.StatusBadRequest, "failed to read video file"}
 	}
 
 	if err := processor.ValidateMagicBytes(bytes.NewReader(data)); err != nil {
-		return nil, "", 0, &requestError{http.StatusBadRequest, "invalid file format: supported formats are MP4, MOV, WebM, MKV, AVI"}
+		return nil, "", &requestError{http.StatusBadRequest, "invalid file format: supported formats are MP4, MOV, WebM, MKV, AVI"}
 	}
 
-	title := r.FormValue("title")
+	return data, r.FormValue("title"), nil
+}
 
-	var price uint64
-	if v := r.FormValue("price"); v != "" {
-		price, err = strconv.ParseUint(v, 10, 64)
-		if err != nil {
-			return nil, "", 0, &requestError{http.StatusBadRequest, "invalid price: must be a positive integer (MIST)"}
+func (h *Upload) parsePaidRequest(r *http.Request) ([]byte, []byte, string, *requestError) {
+	file, header, err := r.FormFile("preview")
+	if err != nil {
+		return nil, nil, "", &requestError{http.StatusBadRequest, "paid uploads require a 'preview' field (short video clip generated client-side)"}
+	}
+	defer file.Close()
+
+	if err := processor.ValidateSize(header.Size, h.cfg.MaxPreviewSize); err != nil {
+		return nil, nil, "", &requestError{http.StatusRequestEntityTooLarge, err.Error()}
+	}
+
+	previewData, err := io.ReadAll(file)
+	if err != nil {
+		return nil, nil, "", &requestError{http.StatusBadRequest, "failed to read preview file"}
+	}
+
+	if err := processor.ValidateMagicBytes(bytes.NewReader(previewData)); err != nil {
+		return nil, nil, "", &requestError{http.StatusBadRequest, "invalid preview format: supported formats are MP4, MOV, WebM, MKV, AVI"}
+	}
+
+	var thumbnailData []byte
+	if thumbFile, _, thumbErr := r.FormFile("thumbnail"); thumbErr == nil {
+		defer thumbFile.Close()
+		thumbData, readErr := io.ReadAll(thumbFile)
+		if readErr != nil {
+			return nil, nil, "", &requestError{http.StatusBadRequest, "failed to read thumbnail file"}
+		}
+		if err := processor.ValidateJPEGMagicBytes(bytes.NewReader(thumbData)); err != nil {
+			return nil, nil, "", &requestError{http.StatusBadRequest, "invalid thumbnail format: expected JPEG"}
+		}
+		thumbnailData = thumbData
+	}
+
+	return previewData, thumbnailData, r.FormValue("title"), nil
+}
+
+// processAndUploadPaid handles async processing for paid video uploads.
+// The preview and thumbnail are already validated and provided by the frontend.
+func (h *Upload) processAndUploadPaid(id string, previewData, thumbnailData []byte) {
+	if h.cfg.FFmpegEnabled {
+		if err := processor.ValidatePreviewDuration(previewData, h.cfg.MaxPreviewDuration, h.cfg.FFprobePath); err != nil {
+			slog.Error("preview duration validation failed", "id", id, "error", err)
+			h.videos.SetFailed(id, err.Error())
+			return
 		}
 	}
 
-	return data, title, price, nil
-}
+	thumbBlobID, thumbBlobURL := h.uploadThumbnail(id, thumbnailData)
 
-func (h *Upload) processAndUpload(id string, data []byte) {
-	video, ok := h.videos.Get(id)
-	if !ok {
+	previewBlobID, err := h.walrus.Store(previewData, h.cfg.WalrusEpochs)
+	if err != nil {
+		slog.Error("walrus upload failed", "id", id, "error", err)
+		h.videos.SetFailed(id, "upload to Walrus failed: "+err.Error())
 		return
 	}
+	previewBlobURL := h.walrus.BlobURL(previewBlobID)
+	h.videos.SetReady(id, thumbBlobID, thumbBlobURL, previewBlobID, previewBlobURL, "", "")
+	slog.Info("preview uploaded to walrus (paid video, awaiting encrypted full blob)",
+		"id", id,
+		"preview_blob_id", previewBlobID,
+	)
+}
 
+// processAndUpload handles async processing for free video uploads.
+func (h *Upload) processAndUpload(id string, data []byte) {
 	previewData := data
 	var thumbnailData []byte
 	if h.cfg.FFmpegEnabled {
@@ -137,26 +226,6 @@ func (h *Upload) processAndUpload(id string, data []byte) {
 		slog.Info("ffmpeg disabled; using full file as preview", "id", id)
 	}
 
-	// Paid videos: upload only preview + thumbnail; full blob is encrypted + uploaded by the frontend
-	if video.Price > 0 {
-		thumbBlobID, thumbBlobURL := h.uploadThumbnail(id, thumbnailData)
-
-		previewBlobID, err := h.walrus.Store(previewData, h.cfg.WalrusEpochs)
-		if err != nil {
-			slog.Error("walrus upload failed", "id", id, "error", err)
-			h.videos.SetFailed(id, "upload to Walrus failed: "+err.Error())
-			return
-		}
-		previewBlobURL := h.walrus.BlobURL(previewBlobID)
-		h.videos.SetReady(id, thumbBlobID, thumbBlobURL, previewBlobID, previewBlobURL, "", "")
-		slog.Info("preview uploaded to walrus (paid video, awaiting encrypted full blob)",
-			"id", id,
-			"preview_blob_id", previewBlobID,
-		)
-		return
-	}
-
-	// Free videos: upload thumbnail, preview, and full blobs
 	thumbBlobID, thumbBlobURL := h.uploadThumbnail(id, thumbnailData)
 
 	fastData := data
