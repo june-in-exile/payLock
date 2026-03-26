@@ -379,7 +379,7 @@ async function confirmUpload(fileInput) {
   if (priceMist > 0) formData.append('price', priceMist.toString());
 
   let authHeaders = null;
-  if (priceMist > 0 && isWalletConnected()) {
+  if (isWalletConnected()) {
     const auth = await signForAuth('upload', '');
     authHeaders = {};
     setAuthHeaders(authHeaders, auth);

@@ -97,12 +97,18 @@ func (h *Upload) handleFreeUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Optionally extract creator from wallet auth headers (not required for free uploads).
+	var creator string
+	if auth := extractAndVerifyWalletAuth(r, h.verifier, h.clock, "upload", ""); auth.err == "" {
+		creator = auth.address
+	}
+
 	id := generateID()
 	if title == "" {
 		title = id
 	}
 
-	h.videos.Create(id, title, 0, "")
+	h.videos.Create(id, title, 0, creator)
 
 	go h.processAndUpload(id, data, previewDuration)
 
