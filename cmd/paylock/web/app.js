@@ -6,6 +6,7 @@ import {
 import { MyVideosView } from './my-videos-view.js';
 import { BrowseView } from './browse-view.js';
 import { PlayerView } from './player-view.js';
+import { detectVideoDuration } from './upload-section.js';
 
 function Header() {
   const wallet = walletState.value;
@@ -142,7 +143,10 @@ function App() {
       e.preventDefault();
       dragCounter = 0;
       setDragging(false);
-      if (e.dataTransfer.files.length > 0 && currentView.value === 'my-videos') stageNewFile(e.dataTransfer.files[0]);
+      if (e.dataTransfer.files.length > 0 && currentView.value === 'my-videos') {
+        stageNewFile(e.dataTransfer.files[0]);
+        detectVideoDuration(e.dataTransfer.files[0]);
+      }
     }
 
     window.addEventListener('dragenter', onDragEnter);

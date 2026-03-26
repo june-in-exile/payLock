@@ -220,19 +220,33 @@ async function fetchPreviewConfig() {
 
 fetchPreviewConfig();
 
-function detectVideoDuration(file) {
+export function detectVideoDuration(file) {
   const video = document.createElement('video');
   video.preload = 'metadata';
   const url = URL.createObjectURL(file);
   video.src = url;
-  video.addEventListener('loadedmetadata', () => {
-    URL.revokeObjectURL(url);
+
+  function tryRead() {
     if (Number.isFinite(video.duration) && video.duration > 0) {
       videoDuration = video.duration;
-    } else {
-      videoDuration = null;
+      URL.revokeObjectURL(url);
+      updatePreviewControls();
+      return true;
     }
-    updatePreviewControls();
+    return false;
+  }
+
+  video.addEventListener('loadedmetadata', () => {
+    if (!tryRead()) {
+      // MOV/some formats report Infinity initially; wait for durationchange
+      video.addEventListener('durationchange', () => {
+        if (tryRead()) return;
+        // Still not finite — give up
+        URL.revokeObjectURL(url);
+        videoDuration = null;
+        updatePreviewControls();
+      }, { once: true });
+    }
   });
   video.addEventListener('error', () => {
     URL.revokeObjectURL(url);
@@ -333,6 +347,32 @@ function pollFallback(id) {
   });
 }
 
+function pollUntilPreviewUploaded(id) {
+  return new Promise((resolve, reject) => {
+    if (typeof EventSource !== 'undefined') {
+      const es = new EventSource('/api/status/' + encodeURIComponent(id) + '/events');
+      es.onmessage = (e) => {
+        const video = JSON.parse(e.data);
+        if (video.status === 'failed') { es.close(); reject(new Error(video.error || 'Upload failed')); }
+        else if (video.preview_blob_id) { es.close(); resolve(video); }
+      };
+      es.onerror = () => {
+        es.close();
+        const interval = setInterval(async () => {
+          try {
+            const res = await fetch('/api/status/' + encodeURIComponent(id));
+            if (!res.ok) return;
+            const video = await res.json();
+            if (video.status === 'failed') { clearInterval(interval); reject(new Error(video.error || 'Upload failed')); }
+            else if (video.preview_blob_id) { clearInterval(interval); resolve(video); }
+          } catch (err) { clearInterval(interval); reject(err); }
+        }, 1000);
+      };
+      return;
+    }
+  });
+}
+
 async function confirmUpload(fileInput) {
   const staged = stagedFile.value;
   if (!staged) return;
@@ -397,7 +437,7 @@ async function confirmUpload(fileInput) {
       const mod = await loadWallet();
 
       const [video, encResult] = await Promise.all([
-        pollUntilReady(data.id).then((v) => {
+        pollUntilPreviewUploaded(data.id).then((v) => {
           uploadState.value = { ...uploadState.value, previewDone: true };
           return v;
         }),
@@ -529,7 +569,7 @@ export function UploadSection() {
 
         <div style="display:flex; align-items:center; justify-content:flex-end;">
           <div style="display:flex; gap:0.75rem; align-items:center;">
-            <button class="btn" onclick=${handleUploadAction} disabled=${isUploading}>
+            <button class="btn" onclick=${handleUploadAction} disabled=${uploadState.value.active}>
               ${staged ? 'Confirm Upload' : 'Select Video'}
             </button>
             <input type="file" ref=${inputRef} accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/avi,.mp4,.mov,.webm,.mkv,.avi" style="display:none" onchange=${onFileChange} />

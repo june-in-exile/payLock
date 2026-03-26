@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"mime/multipart"
@@ -21,7 +22,7 @@ type mockStorer struct {
 	storeFunc func(data []byte, epochs int) (string, error)
 }
 
-func (m *mockStorer) Store(data []byte, epochs int) (string, error) {
+func (m *mockStorer) Store(_ context.Context, data []byte, epochs int) (string, error) {
 	return m.storeFunc(data, epochs)
 }
 
@@ -201,7 +202,7 @@ func TestUpload_PaidPreview_Accepted(t *testing.T) {
 	}}
 	videos := mustNewVideoStore(t)
 	v := &mockVerifier{address: "0xAlice", err: nil}
-	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()))
+	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()), nil)
 
 	req := createPaidMultipartRequest(t, mp4Data, nil, map[string]string{
 		"price": "100000000",
@@ -231,7 +232,7 @@ func TestUpload_PaidPreview_MissingPreviewField(t *testing.T) {
 	}}
 	videos := mustNewVideoStore(t)
 	v := &mockVerifier{address: "0xAlice", err: nil}
-	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()))
+	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()), nil)
 
 	// Send "video" field instead of "preview" — should fail
 	req := createMultipartRequest(t, "video", "test.mp4", mp4Data, map[string]string{
@@ -253,7 +254,7 @@ func TestUpload_PaidPreview_InvalidFormat(t *testing.T) {
 	}}
 	videos := mustNewVideoStore(t)
 	v := &mockVerifier{address: "0xAlice", err: nil}
-	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()))
+	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()), nil)
 
 	req := createPaidMultipartRequest(t, []byte("not a valid video format!!"), nil, map[string]string{
 		"price": "100000000",
@@ -304,7 +305,7 @@ func TestUpload_PaidPreview_WithThumbnail(t *testing.T) {
 	}}
 	videos := mustNewVideoStore(t)
 	v := &mockVerifier{address: "0xAlice", err: nil}
-	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()))
+	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()), nil)
 
 	req := createPaidMultipartRequest(t, mp4Data, jpegData, map[string]string{
 		"price": "100000000",
@@ -328,7 +329,7 @@ func TestUpload_PaidPreview_InvalidThumbnail(t *testing.T) {
 	}}
 	videos := mustNewVideoStore(t)
 	v := &mockVerifier{address: "0xAlice", err: nil}
-	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()))
+	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()), nil)
 
 	req := createPaidMultipartRequest(t, mp4Data, []byte("not a jpeg"), map[string]string{
 		"price": "100000000",

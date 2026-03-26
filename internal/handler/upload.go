@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -9,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/anthropics/paylock/internal/config"
 	"github.com/anthropics/paylock/internal/model"
@@ -16,9 +18,11 @@ import (
 	"github.com/anthropics/paylock/internal/suiauth"
 )
 
+const uploadTimeout = 5 * time.Minute
+
 // Storer abstracts Walrus blob storage for testability.
 type Storer interface {
-	Store(data []byte, epochs int) (string, error)
+	Store(ctx context.Context, data []byte, epochs int) (string, error)
 	BlobURL(blobID string) string
 }
 
@@ -111,7 +115,11 @@ func (h *Upload) handleFreeUpload(w http.ResponseWriter, r *http.Request) {
 
 	h.videos.Create(id, title, 0, creator)
 
-	go h.processAndUpload(id, data, previewDuration)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), uploadTimeout)
+		defer cancel()
+		h.processAndUpload(ctx, id, data, previewDuration)
+	}()
 
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"id":     id,
@@ -149,7 +157,11 @@ func (h *Upload) handlePaidUpload(w http.ResponseWriter, r *http.Request, price 
 
 	h.videos.Create(id, title, price, auth.address)
 
-	go h.processAndUploadPaid(id, previewData, thumbnailData)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), uploadTimeout)
+		defer cancel()
+		h.processAndUploadPaid(ctx, id, previewData, thumbnailData)
+	}()
 
 	resp := map[string]any{
 		"id":     id,
@@ -222,7 +234,7 @@ func (h *Upload) parsePaidRequest(r *http.Request) ([]byte, []byte, string, *req
 
 // processAndUploadPaid handles async processing for paid video uploads.
 // The preview and thumbnail are already validated and provided by the frontend.
-func (h *Upload) processAndUploadPaid(id string, previewData, thumbnailData []byte) {
+func (h *Upload) processAndUploadPaid(ctx context.Context, id string, previewData, thumbnailData []byte) {
 	if h.cfg.FFmpegEnabled {
 		if err := processor.ValidatePreviewDuration(previewData, h.cfg.MaxPreviewDuration, h.cfg.FFprobePath); err != nil {
 			slog.Error("preview duration validation failed", "id", id, "error", err)
@@ -231,9 +243,9 @@ func (h *Upload) processAndUploadPaid(id string, previewData, thumbnailData []by
 		}
 	}
 
-	thumbBlobID, thumbBlobURL := h.uploadThumbnail(id, thumbnailData)
+	thumbBlobID, thumbBlobURL := h.uploadThumbnail(ctx, id, thumbnailData)
 
-	previewBlobID, err := h.walrus.Store(previewData, h.cfg.WalrusEpochs)
+	previewBlobID, err := h.walrus.Store(ctx, previewData, h.cfg.WalrusEpochs)
 	if err != nil {
 		slog.Error("walrus upload failed", "id", id, "error", err)
 		h.videos.SetFailed(id, "upload to Walrus failed: "+err.Error())
@@ -248,7 +260,7 @@ func (h *Upload) processAndUploadPaid(id string, previewData, thumbnailData []by
 }
 
 // processAndUpload handles async processing for free video uploads.
-func (h *Upload) processAndUpload(id string, data []byte, previewDuration int) {
+func (h *Upload) processAndUpload(ctx context.Context, id string, data []byte, previewDuration int) {
 	previewData := data
 	var thumbnailData []byte
 	if h.cfg.FFmpegEnabled {
@@ -268,7 +280,7 @@ func (h *Upload) processAndUpload(id string, data []byte, previewDuration int) {
 		slog.Info("ffmpeg disabled; using full file as preview", "id", id)
 	}
 
-	thumbBlobID, thumbBlobURL := h.uploadThumbnail(id, thumbnailData)
+	thumbBlobID, thumbBlobURL := h.uploadThumbnail(ctx, id, thumbnailData)
 
 	fastData := data
 	if h.cfg.FFmpegEnabled {
@@ -281,7 +293,7 @@ func (h *Upload) processAndUpload(id string, data []byte, previewDuration int) {
 	}
 
 	if !h.cfg.FFmpegEnabled || bytes.Equal(previewData, fastData) {
-		fullBlobID, err := h.walrus.Store(fastData, h.cfg.WalrusEpochs)
+		fullBlobID, err := h.walrus.Store(ctx, fastData, h.cfg.WalrusEpochs)
 		if err != nil {
 			slog.Error("walrus upload failed", "id", id, "error", err)
 			h.videos.SetFailed(id, "upload to Walrus failed: "+err.Error())
@@ -296,7 +308,7 @@ func (h *Upload) processAndUpload(id string, data []byte, previewDuration int) {
 		return
 	}
 
-	previewBlobID, fullBlobID, err := h.uploadBothBlobs(previewData, fastData)
+	previewBlobID, fullBlobID, err := h.uploadBothBlobs(ctx, previewData, fastData)
 	if err != nil {
 		slog.Error("walrus upload failed", "id", id, "error", err)
 		h.videos.SetFailed(id, "upload to Walrus failed: "+err.Error())
@@ -314,11 +326,11 @@ func (h *Upload) processAndUpload(id string, data []byte, previewDuration int) {
 }
 
 // uploadThumbnail uploads thumbnail data to Walrus. Returns empty strings if thumbnail is nil.
-func (h *Upload) uploadThumbnail(id string, thumbnailData []byte) (string, string) {
+func (h *Upload) uploadThumbnail(ctx context.Context, id string, thumbnailData []byte) (string, string) {
 	if len(thumbnailData) == 0 {
 		return "", ""
 	}
-	blobID, err := h.walrus.Store(thumbnailData, h.cfg.WalrusEpochs)
+	blobID, err := h.walrus.Store(ctx, thumbnailData, h.cfg.WalrusEpochs)
 	if err != nil {
 		slog.Warn("thumbnail upload failed", "id", id, "error", err)
 		return "", ""
@@ -327,7 +339,7 @@ func (h *Upload) uploadThumbnail(id string, thumbnailData []byte) (string, strin
 }
 
 // uploadBothBlobs uploads preview and full data to Walrus in parallel.
-func (h *Upload) uploadBothBlobs(preview, full []byte) (string, string, error) {
+func (h *Upload) uploadBothBlobs(ctx context.Context, preview, full []byte) (string, string, error) {
 	type result struct {
 		blobID string
 		err    error
@@ -337,11 +349,11 @@ func (h *Upload) uploadBothBlobs(preview, full []byte) (string, string, error) {
 	fullCh := make(chan result, 1)
 
 	go func() {
-		blobID, err := h.walrus.Store(preview, h.cfg.WalrusEpochs)
+		blobID, err := h.walrus.Store(ctx, preview, h.cfg.WalrusEpochs)
 		previewCh <- result{blobID, err}
 	}()
 	go func() {
-		blobID, err := h.walrus.Store(full, h.cfg.WalrusEpochs)
+		blobID, err := h.walrus.Store(ctx, full, h.cfg.WalrusEpochs)
 		fullCh <- result{blobID, err}
 	}()
 

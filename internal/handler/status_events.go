@@ -23,11 +23,10 @@ func (h *StatusEvents) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	video, ok := h.videos.Get(id)
-	if !ok {
-		video, ok = h.videos.GetBySuiObjectID(id)
-	}
-	if !ok {
+	// Atomically resolve the video and subscribe if still processing.
+	// This eliminates the race between checking status and subscribing.
+	ch, video, _, found := h.videos.ResolveAndSubscribeIfProcessing(id)
+	if !found {
 		http.NotFound(w, r)
 		return
 	}
@@ -43,7 +42,7 @@ func (h *StatusEvents) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 
 	// If already terminal, send one event and close.
-	if video.Status == model.StatusReady || video.Status == model.StatusFailed {
+	if ch == nil {
 		writeSSEEvent(w, flusher, video)
 		return
 	}
@@ -51,10 +50,7 @@ func (h *StatusEvents) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Send initial processing event.
 	writeSSEEvent(w, flusher, video)
 
-	// Subscribe and wait for status change.
-	ch, cancel := h.videos.Subscribe(id)
-	defer cancel()
-
+	// Wait for status change.
 	select {
 	case v := <-ch:
 		writeSSEEvent(w, flusher, &v)

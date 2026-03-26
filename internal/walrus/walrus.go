@@ -1,6 +1,7 @@
 package walrus
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -47,10 +48,10 @@ const maxRetries = 3
 
 // Store uploads data to Walrus and returns the blob ID.
 // Retries up to maxRetries times with exponential backoff on transient errors.
-func (c *Client) Store(data []byte, epochs int) (string, error) {
+func (c *Client) Store(ctx context.Context, data []byte, epochs int) (string, error) {
 	var lastErr error
 	for attempt := range maxRetries {
-		blobID, err := c.storeOnce(data, epochs)
+		blobID, err := c.storeOnce(ctx, data, epochs)
 		if err == nil {
 			return blobID, nil
 		}
@@ -58,15 +59,24 @@ func (c *Client) Store(data []byte, epochs int) (string, error) {
 		if !isTransient(err) {
 			return "", err
 		}
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("store blob: %w", ctx.Err())
+		}
 		backoff := time.Duration(math.Pow(2, float64(attempt))) * time.Second
-		time.Sleep(backoff)
+		timer := time.NewTimer(backoff)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return "", fmt.Errorf("store blob: %w", ctx.Err())
+		case <-timer.C:
+		}
 	}
 	return "", fmt.Errorf("store blob after %d attempts: %w", maxRetries, lastErr)
 }
 
-func (c *Client) storeOnce(data []byte, epochs int) (string, error) {
+func (c *Client) storeOnce(ctx context.Context, data []byte, epochs int) (string, error) {
 	url := fmt.Sprintf("%s/v1/blobs?epochs=%d", c.publisherURL, epochs)
-	req, err := http.NewRequest(http.MethodPut, url, io.NopCloser(
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, io.NopCloser(
 		io.NewSectionReader(readerAt(data), 0, int64(len(data))),
 	))
 	if err != nil {

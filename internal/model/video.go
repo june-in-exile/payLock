@@ -93,6 +93,53 @@ func (s *VideoStore) Subscribe(id string) (<-chan Video, func()) {
 	return ch, cancel
 }
 
+// SubscribeIfProcessing atomically checks video status and subscribes if still processing.
+// This eliminates the race condition between checking status and subscribing.
+// Returns (nil, video, true) if video is already terminal (ready/failed).
+// Returns (ch, video, true) if subscribed successfully (still processing).
+// Returns (nil, nil, false) if video not found.
+func (s *VideoStore) SubscribeIfProcessing(id string) (<-chan Video, *Video, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, ok := s.videos[id]
+	if !ok {
+		return nil, nil, false
+	}
+	copied := *v
+	if v.Status == StatusReady || v.Status == StatusFailed {
+		return nil, &copied, true
+	}
+	ch := make(chan Video, 1)
+	s.subscribers[id] = append(s.subscribers[id], ch)
+	return ch, &copied, true
+}
+
+// ResolveAndSubscribeIfProcessing resolves by paylock_id or sui_object_id,
+// then atomically subscribes if still processing.
+// Returns (ch, video, canonical, true) or (nil, nil, false, false) if not found.
+func (s *VideoStore) ResolveAndSubscribeIfProcessing(id string) (<-chan Video, *Video, bool, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	v, ok := s.videos[id]
+	canonical := false
+	if !ok {
+		v, ok = s.byObjectID[id]
+		canonical = true
+	}
+	if !ok {
+		return nil, nil, false, false
+	}
+
+	copied := *v
+	if v.Status == StatusReady || v.Status == StatusFailed {
+		return nil, &copied, canonical, true
+	}
+	ch := make(chan Video, 1)
+	s.subscribers[v.ID] = append(s.subscribers[v.ID], ch)
+	return ch, &copied, canonical, true
+}
+
 // notify sends the video to all subscribers for the given ID. Must be called with mu held.
 func (s *VideoStore) notify(id string) {
 	v, ok := s.videos[id]
@@ -193,6 +240,7 @@ func (s *VideoStore) SetPreviewUploaded(id, thumbnailBlobID, thumbnailBlobURL, p
 		v.PreviewBlobID = previewBlobID
 		v.PreviewBlobURL = previewBlobURL
 		s.persist()
+		s.notify(id)
 	}
 }
 
@@ -315,11 +363,21 @@ func (s *VideoStore) load() error {
 	if err := json.Unmarshal(data, &videos); err != nil {
 		return err
 	}
+	staleCount := 0
 	for _, v := range videos {
+		if v.Status == StatusProcessing {
+			v.Status = StatusFailed
+			v.Error = "interrupted by server restart"
+			staleCount++
+		}
 		s.videos[v.ID] = v
 		if v.SuiObjectID != "" {
 			s.byObjectID[v.SuiObjectID] = v
 		}
+	}
+	if staleCount > 0 {
+		slog.Warn("marked stale processing videos as failed", "count", staleCount)
+		s.persist()
 	}
 	slog.Info("loaded videos from disk", "count", len(videos), "path", s.filePath)
 	return nil
