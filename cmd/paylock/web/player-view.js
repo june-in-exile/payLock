@@ -366,6 +366,11 @@ export function PlayerView() {
     }
   }
 
+  function shortAddr(addr) {
+    if (!addr || addr.length < 12) return addr || '';
+    return addr.slice(0, 6) + '...' + addr.slice(-4);
+  }
+
   const safeStatus = ['ready', 'processing', 'failed'].includes(status) ? status : 'failed';
   const title = video ? (video.title || video.id) : (params.id || '');
 
@@ -373,11 +378,26 @@ export function PlayerView() {
     <div class="view active">
       <a class="back-link" onclick=${() => navigate('my-videos')}>\u2190 Back to videos</a>
       <div class="player-info">
-        <div style="display:flex; flex-direction:column;">
-          <span style="font-size:1.25rem; font-weight:600; margin-bottom:0.25rem;">${title}</span>
-          <span style="font-size:0.8rem; color:var(--text-muted); font-family:monospace;">${params.id}</span>
+        <div style="display:flex; flex-direction:column; gap:0.35rem; min-width:0;">
+          <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+            <span style="font-size:1.25rem; font-weight:600;">${title}</span>
+            ${status !== 'loading' && html`<span class=${'status-badge ' + safeStatus}>${status}</span>`}
+          </div>
+          <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; font-size:0.8rem; color:var(--text-muted);">
+            ${video && video.sui_object_id
+              ? html`<span>Object ID: <a href=${'https://suiscan.xyz/testnet/object/' + video.sui_object_id} target="_blank" rel="noopener noreferrer"
+                  style="font-family:monospace; color:var(--accent); text-decoration:none; border-bottom:1px dashed var(--accent);"
+                  title=${video.sui_object_id}>${shortAddr(video.sui_object_id)}</a></span>`
+              : html`<span>ID: <span style="font-family:monospace;">${params.id}</span></span>`
+            }
+            ${video && video.creator && html`
+              <span style="opacity:0.4;">\u00b7</span>
+              <span>Owner: <a href=${'https://suiscan.xyz/testnet/account/' + video.creator} target="_blank" rel="noopener noreferrer"
+                style="font-family:monospace; color:var(--accent); text-decoration:none; border-bottom:1px dashed var(--accent);"
+                title=${video.creator}>${shortAddr(video.creator)}</a></span>
+            `}
+          </div>
         </div>
-        ${status !== 'loading' && html`<span class=${'status-badge ' + safeStatus}>${status}</span>`}
       </div>
 
       <div class="player-container" style="position: relative;">

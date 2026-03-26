@@ -22,6 +22,11 @@ export async function deleteVideo(id, onDeleted) {
   }
 }
 
+function shortAddr(addr) {
+  if (!addr || addr.length < 12) return addr || '';
+  return addr.slice(0, 6) + '...' + addr.slice(-4);
+}
+
 export function VideoCard({ video, showDelete, onDeleted, accessState }) {
   const safeStatus = ['ready', 'processing', 'failed'].includes(video.status) ? video.status : 'failed';
   const isPaid = video.price > 0;
@@ -50,7 +55,13 @@ export function VideoCard({ video, showDelete, onDeleted, accessState }) {
           ${video.title || video.id}
         </div>
         <div class="video-meta">
-          <span style="font-family:monospace">ID: ${video.id.slice(0, 8)}</span>
+          ${video.sui_object_id
+            ? html`<span>Object ID: <a href=${'https://suiscan.xyz/testnet/object/' + video.sui_object_id} target="_blank" rel="noopener noreferrer"
+                onclick=${(e) => e.stopPropagation()}
+                style="font-family:monospace; color:var(--accent); text-decoration:none; border-bottom:1px dashed var(--accent);"
+                title=${video.sui_object_id}>${shortAddr(video.sui_object_id)}</a></span>`
+            : html`<span style="font-family:monospace">ID: ${video.id}</span>`
+          }
           <span class=${'status-badge ' + safeStatus}>${video.status}</span>
           <span class=${isPaid ? 'price-badge paid' : 'price-badge free'}>
             ${isPaid ? formatSui(video.price) + ' SUI' : 'Free'}
@@ -59,6 +70,14 @@ export function VideoCard({ video, showDelete, onDeleted, accessState }) {
             <span class=${'access-badge ' + safeAccess}>${accessLabel}</span>
           `}
           <span>${formatDate(video.created_at)}</span>
+          ${video.creator && html`
+            <span>Owner: <a href=${'https://suiscan.xyz/testnet/account/' + video.creator} target="_blank" rel="noopener noreferrer"
+              onclick=${(e) => e.stopPropagation()}
+              style="font-family:monospace; color:var(--accent); text-decoration:none; border-bottom:1px dashed var(--accent);"
+              title=${video.creator}>
+              ${shortAddr(video.creator)}
+            </a></span>
+          `}
         </div>
       </div>
       ${showDelete && html`
