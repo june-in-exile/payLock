@@ -27,7 +27,7 @@ func (h *Delete) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	video, ok := h.videos.Get(id)
+	video, _, ok := h.videos.Resolve(id)
 	if !ok {
 		writeJSON(w, http.StatusNotFound, map[string]string{
 			"error": "video not found",
@@ -51,10 +51,10 @@ func (h *Delete) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.videos.Delete(id)
-	slog.Info("video deleted", "id", id)
+	h.videos.Delete(video.ID)
+	slog.Info("video deleted", "id", video.ID)
 	writeJSON(w, http.StatusOK, map[string]string{
-		"id":     id,
+		"id":     video.ID,
 		"status": "deleted",
 	})
 }

@@ -1,10 +1,16 @@
 import { html } from './lib.js';
-import { navigate, formatDate, formatSui } from './state.js';
+import { navigate, formatDate, formatSui, loadWallet } from './state.js';
 import { signForAuth, setAuthHeaders, isWalletConnected } from './wallet.js';
 
-export async function deleteVideo(id, onDeleted) {
+export async function deleteVideo(id, suiObjectId, onDeleted) {
   if (!confirm('Are you sure you want to delete this video? This action cannot be undone.')) return;
   try {
+    // If the video is on-chain, delete it from the chain first.
+    if (suiObjectId && isWalletConnected()) {
+      const mod = await loadWallet();
+      await mod.deleteVideoOnChain(suiObjectId);
+    }
+
     const headers = {};
     if (isWalletConnected()) {
       const auth = await signForAuth('delete', id);
@@ -42,13 +48,21 @@ export function VideoCard({ video, showDelete, onDeleted, accessState }) {
   return html`
     <div class="video-card">
       <div class="video-thumb" style="cursor:pointer" onclick=${() => navigate('player', { id: video.id })}>
-        ${video.thumbnail_blob_url && video.status === 'ready'
-          ? html`
-              <img src=${video.thumbnail_blob_url} alt=${video.title || video.id}
-                style="width:100%;height:100%;object-fit:cover;" />
-              <div class="play-overlay">\u25B6</div>
-            `
-          : video.status === 'ready' ? '\u25B6' : '\u2026'}
+        ${video.status === 'ready'
+          ? video.thumbnail_blob_url
+            ? html`
+                <img src=${video.thumbnail_blob_url} alt=${video.title || video.id}
+                  style="width:100%;height:100%;object-fit:cover;" />
+                <div class="play-overlay">\u25B6</div>
+              `
+            : video.preview_blob_url
+              ? html`
+                  <video src=${video.preview_blob_url} muted preload="metadata"
+                    style="width:100%;height:100%;object-fit:cover;pointer-events:none;" />
+                  <div class="play-overlay">\u25B6</div>
+                `
+              : html`<div class="play-overlay">\u25B6</div>`
+          : '\u2026'}
       </div>
       <div class="video-info">
         <div class="video-id" style="cursor:pointer" onclick=${() => navigate('player', { id: video.id })}>
@@ -82,7 +96,7 @@ export function VideoCard({ video, showDelete, onDeleted, accessState }) {
       </div>
       ${showDelete && html`
         <div class="video-actions">
-          <button class="btn btn-sm btn-danger" onclick=${(e) => { e.stopPropagation(); deleteVideo(video.id, onDeleted); }}>
+          <button class="btn btn-sm btn-danger" onclick=${(e) => { e.stopPropagation(); deleteVideo(video.id, video.sui_object_id, onDeleted); }}>
             Delete
           </button>
         </div>

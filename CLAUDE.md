@@ -41,7 +41,7 @@ cmd/paylock/main.go          — wires all packages; route groups:
                             POST /api/upload, GET /api/status/{id}
                             GET /api/videos
                             DELETE /api/videos/{id}
-                            PUT /api/videos/{id}, GET /api/config
+                            GET /api/config
                             POST /api/reindex
                             GET /stream/{id}/preview → canonical: sui_object_id; legacy: paylock_id (307 redirect)
                             GET /stream/{id}/full

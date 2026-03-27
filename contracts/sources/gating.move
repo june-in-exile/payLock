@@ -1,5 +1,6 @@
 module paylock::gating {
     use sui::coin::{Self, Coin};
+    use sui::event;
     use sui::sui::SUI;
     use std::string::String;
 
@@ -17,11 +18,29 @@ module paylock::gating {
     /// Shared object so anyone can reference it for purchase and seal_approve.
     public struct Video has key {
         id: UID,
+        title: String,
+        price: u64,
+        creator: address,
+        thumbnail_blob_id: String,
+        preview_blob_id: String,
+        full_blob_id: String,
+        seal_namespace: vector<u8>,
+    }
+
+    /// Emitted when a new video is created, so off-chain watchers can detect it.
+    public struct VideoCreated has copy, drop {
+        video_id: ID,
+        title: String,
         price: u64,
         creator: address,
         preview_blob_id: String,
         full_blob_id: String,
-        seal_namespace: vector<u8>,
+    }
+
+    /// Emitted when a video is deleted by its creator.
+    public struct VideoDeleted has copy, drop {
+        video_id: ID,
+        creator: address,
     }
 
     /// Proof of purchase, minted after payment. Owned by the buyer.
@@ -35,7 +54,9 @@ module paylock::gating {
     /// Creator publishes a new video with preview and full blob IDs.
     /// For paid videos (price > 0), seal_namespace must be non-empty.
     public fun create_video(
+        title: String,
         price: u64,
+        thumbnail_blob_id: String,
         preview_blob_id: String,
         full_blob_id: String,
         seal_namespace: vector<u8>,
@@ -47,13 +68,45 @@ module paylock::gating {
 
         let video = Video {
             id: object::new(ctx),
+            title,
             price,
             creator: tx_context::sender(ctx),
+            thumbnail_blob_id,
             preview_blob_id,
             full_blob_id,
             seal_namespace,
         };
+
+        event::emit(VideoCreated {
+            video_id: object::id(&video),
+            title,
+            price,
+            creator: tx_context::sender(ctx),
+            preview_blob_id,
+            full_blob_id,
+        });
+
         transfer::share_object(video);
+    }
+
+    /// Creator deletes their video. Destroys the shared Video object.
+    /// Only the original creator can call this.
+    entry fun delete_video(
+        video: Video,
+        ctx: &TxContext,
+    ) {
+        assert!(tx_context::sender(ctx) == video.creator, ENotCreator);
+
+        let creator = video.creator;
+        let video_id = object::id(&video);
+
+        event::emit(VideoDeleted {
+            video_id,
+            creator,
+        });
+
+        let Video { id, title: _, price: _, creator: _, thumbnail_blob_id: _, preview_blob_id: _, full_blob_id: _, seal_namespace: _ } = video;
+        object::delete(id);
     }
 
     /// User pays to unlock a video. Mints an AccessPass on success.
@@ -145,8 +198,10 @@ module paylock::gating {
 
     // === Accessors (for testing and frontend queries) ===
 
+    public fun video_title(video: &Video): &String { &video.title }
     public fun video_price(video: &Video): u64 { video.price }
     public fun video_creator(video: &Video): address { video.creator }
+    public fun video_thumbnail_blob_id(video: &Video): &String { &video.thumbnail_blob_id }
     public fun video_preview_blob_id(video: &Video): &String { &video.preview_blob_id }
     public fun video_full_blob_id(video: &Video): &String { &video.full_blob_id }
     public fun video_seal_namespace(video: &Video): &vector<u8> { &video.seal_namespace }

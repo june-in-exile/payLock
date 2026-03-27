@@ -277,7 +277,7 @@ export async function disconnectWallet() {
   };
 }
 
-export async function createVideoOnChain(videoId, price, previewBlobId, fullBlobId, sealNamespace, sessionToken) {
+export async function createVideoOnChain(videoId, title, price, thumbnailBlobId, previewBlobId, fullBlobId, sealNamespace) {
   if (!connectedWallet || !connectedAccount) throw new Error('Wallet not connected');
   if (!gatingPackageId) throw new Error('Gating contract not configured');
   if (!Transaction || !signAndExecuteTransaction) throw new Error('Sui SDK not loaded');
@@ -287,7 +287,9 @@ export async function createVideoOnChain(videoId, price, previewBlobId, fullBlob
   tx.moveCall({
     target: gatingPackageId + '::gating::create_video',
     arguments: [
+      tx.pure.string(title || ''),
       tx.pure.u64(price),
+      tx.pure.string(thumbnailBlobId || ''),
       tx.pure.string(previewBlobId),
       tx.pure.string(fullBlobId),
       tx.pure.vector('u8', sealNamespace || []),
@@ -312,26 +314,30 @@ export async function createVideoOnChain(videoId, price, previewBlobId, fullBlob
 
   if (!created) throw new Error('Video object not found in transaction result');
 
-  const suiObjectId = created.objectId;
+  return created.objectId;
+}
 
-  const putHeaders = { 'Content-Type': 'application/json' };
-  if (sessionToken) {
-    putHeaders['X-Session-Token'] = sessionToken;
-  } else if (connectedAccount) {
-    const auth = await signForAuth('update', videoId);
-    setAuthHeaders(putHeaders, auth);
-  }
-  const res = await fetch('/api/videos/' + encodeURIComponent(videoId), {
-    method: 'PUT',
-    headers: putHeaders,
-    body: JSON.stringify({ sui_object_id: suiObjectId, full_blob_id: fullBlobId }),
+export async function deleteVideoOnChain(suiObjectId) {
+  if (!connectedWallet || !connectedAccount) throw new Error('Wallet not connected');
+  if (!gatingPackageId) throw new Error('Gating contract not configured');
+  if (!Transaction || !signAndExecuteTransaction) throw new Error('Sui SDK not loaded');
+
+  const tx = new Transaction();
+  tx.moveCall({
+    target: gatingPackageId + '::gating::delete_video',
+    arguments: [
+      tx.object(suiObjectId),
+    ],
   });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error('Failed to save Sui object ID: ' + (body.error || res.status));
-  }
 
-  return suiObjectId;
+  const result = await signAndExecuteTransaction(connectedWallet, {
+    transaction: tx,
+    account: connectedAccount,
+    chain: SUI_NETWORK,
+  });
+
+  await suiClient.waitForTransaction({ digest: result.digest });
+  return result.digest;
 }
 
 export async function encryptAndPublish(fileData, onProgress) {
@@ -580,24 +586,7 @@ export async function recoverFullBlobId(video) {
     throw new Error('Could not read full_blob_id from on-chain Video object');
   }
 
-  const fullBlobId = fields.full_blob_id;
-
-  const recoverHeaders = { 'Content-Type': 'application/json' };
-  if (connectedAccount) {
-    const auth = await signForAuth('update', video.id);
-    setAuthHeaders(recoverHeaders, auth);
-  }
-  const res = await fetch('/api/videos/' + encodeURIComponent(video.id), {
-    method: 'PUT',
-    headers: recoverHeaders,
-    body: JSON.stringify({ sui_object_id: video.sui_object_id, full_blob_id: fullBlobId }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error('Failed to save recovered blob ID: ' + (body.error || res.status));
-  }
-
-  return fullBlobId;
+  return fields.full_blob_id;
 }
 
 export async function signForAuth(action, resourceID) {

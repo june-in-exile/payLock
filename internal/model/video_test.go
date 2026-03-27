@@ -387,7 +387,7 @@ func TestVideoStore_ObjectIDIndex_PersistsOnReload(t *testing.T) {
 func TestVideoStore_UpsertFromChain_NewEntry(t *testing.T) {
 	store := newTestStore(t)
 
-	created := store.UpsertFromChain("0xNEW", 500, "0xCreator", "pBlob", "pURL", "fBlob", "fURL")
+	created := store.UpsertFromChain("0xNEW", "Test Title", 500, "0xCreator", "", "", "pBlob", "pURL", "fBlob", "fURL")
 	if !created {
 		t.Fatal("expected new entry to be created")
 	}
@@ -425,7 +425,7 @@ func TestVideoStore_UpsertFromChain_ExistingEntry(t *testing.T) {
 	store.SetSuiObjectID("local-1", "0xEXIST", "", "")
 
 	// Upsert should NOT create a new entry, but should fill in missing blob IDs.
-	created := store.UpsertFromChain("0xEXIST", 0, "", "pBlob", "pURL", "fBlob", "fURL")
+	created := store.UpsertFromChain("0xEXIST", "", 0, "", "", "", "pBlob", "pURL", "fBlob", "fURL")
 	if created {
 		t.Fatal("expected no new entry for existing object")
 	}
@@ -445,7 +445,7 @@ func TestVideoStore_UpsertFromChain_DoesNotOverwrite(t *testing.T) {
 	store.SetReady("local-1", "tb", "tURL", "existingPBlob", "existingPURL", "existingFBlob", "existingFURL")
 	store.SetSuiObjectID("local-1", "0xEXIST", "", "")
 
-	store.UpsertFromChain("0xEXIST", 0, "", "chainPBlob", "chainPURL", "chainFBlob", "chainFURL")
+	store.UpsertFromChain("0xEXIST", "", 0, "", "", "", "chainPBlob", "chainPURL", "chainFBlob", "chainFURL")
 
 	v, _ := store.Get("local-1")
 	if v.PreviewBlobID != "existingPBlob" {

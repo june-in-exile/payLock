@@ -24,5 +24,6 @@ func (h *AppConfig) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"preview_duration_default": h.cfg.PreviewDurationDefault,
 		"preview_duration_min":     h.cfg.MinPreviewDuration,
 		"preview_duration_max":     h.cfg.MaxPreviewDuration,
+		"watcher_interval":         h.cfg.WatcherInterval.Milliseconds(),
 	})
 }

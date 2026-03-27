@@ -56,9 +56,15 @@ function PaywallOverlay({ video, onPurchase, purchaseText, purchasing, hint, isO
   `;
 }
 
-async function deleteVideo(id) {
+async function deleteVideo(id, suiObjectId) {
   if (!confirm('Are you sure you want to delete this video? This action cannot be undone.')) return;
   try {
+    // If the video is on-chain, delete it from the chain first.
+    if (suiObjectId && isWalletConnected()) {
+      const mod = await loadWallet();
+      await mod.deleteVideoOnChain(suiObjectId);
+    }
+
     const headers = {};
     if (isWalletConnected()) {
       const auth = await signForAuth('delete', id);
@@ -447,7 +453,7 @@ export function PlayerView() {
 
       <div class="player-actions">
         ${video && isOwner(video) && html`
-          <button class="btn btn-sm btn-danger" onclick=${() => params.id && deleteVideo(params.id)}>Delete</button>
+          <button class="btn btn-sm btn-danger" onclick=${() => params.id && deleteVideo(params.id, video && video.sui_object_id)}>Delete</button>
         `}
       </div>
     </div>

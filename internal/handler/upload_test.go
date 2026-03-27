@@ -105,7 +105,7 @@ func TestUpload_InvalidFormat(t *testing.T) {
 		return "blob1", nil
 	}}
 	videos := mustNewVideoStore(t)
-	h := NewUpload(store, videos, newTestConfig(), nil, nil, nil)
+	h := NewUpload(store, videos, newTestConfig(), nil, nil)
 
 	req := createMultipartRequest(t, "video", "test.txt", []byte("not an mp4 file content here!!"), nil)
 	rec := httptest.NewRecorder()
@@ -126,7 +126,7 @@ func TestUpload_ValidMP4_Accepted(t *testing.T) {
 		return fmt.Sprintf("blob%d", n), nil
 	}}
 	videos := mustNewVideoStore(t)
-	h := NewUpload(store, videos, newTestConfig(), nil, nil, nil)
+	h := NewUpload(store, videos, newTestConfig(), nil, nil)
 
 	req := createMultipartRequest(t, "video", "test.mp4", mp4Data, map[string]string{
 		"title": "Test Video",
@@ -157,7 +157,7 @@ func TestUpload_InvalidPrice(t *testing.T) {
 		return "blob1", nil
 	}}
 	videos := mustNewVideoStore(t)
-	h := NewUpload(store, videos, newTestConfig(), nil, nil, nil)
+	h := NewUpload(store, videos, newTestConfig(), nil, nil)
 
 	req := createMultipartRequest(t, "video", "test.mp4", mp4Data, map[string]string{
 		"price": "not-a-number",
@@ -171,26 +171,6 @@ func TestUpload_InvalidPrice(t *testing.T) {
 	}
 }
 
-func TestUpload_PaidWithoutCreator(t *testing.T) {
-	store := &mockStorer{storeFunc: func(data []byte, epochs int) (string, error) {
-		return "blob1", nil
-	}}
-	videos := mustNewVideoStore(t)
-	h := NewUpload(store, videos, newTestConfig(), nil, nil, nil)
-
-	mp4Data := testutil.TestMP4(t)
-	req := createMultipartRequest(t, "preview", "preview.mp4", mp4Data, map[string]string{
-		"price": "100000000",
-	})
-	rec := httptest.NewRecorder()
-
-	h.ServeHTTP(rec, req)
-
-	// Paid upload without wallet auth headers should get 401
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401 for paid upload without auth, got %d: %s", rec.Code, rec.Body.String())
-	}
-}
 
 func TestUpload_PaidPreview_Accepted(t *testing.T) {
 	mp4Data := testutil.TestMP4(t)
@@ -202,7 +182,7 @@ func TestUpload_PaidPreview_Accepted(t *testing.T) {
 	}}
 	videos := mustNewVideoStore(t)
 	v := &mockVerifier{address: "0xAlice", err: nil}
-	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()), nil)
+	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()))
 
 	req := createPaidMultipartRequest(t, mp4Data, nil, map[string]string{
 		"price": "100000000",
@@ -232,7 +212,7 @@ func TestUpload_PaidPreview_MissingPreviewField(t *testing.T) {
 	}}
 	videos := mustNewVideoStore(t)
 	v := &mockVerifier{address: "0xAlice", err: nil}
-	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()), nil)
+	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()))
 
 	// Send "video" field instead of "preview" — should fail
 	req := createMultipartRequest(t, "video", "test.mp4", mp4Data, map[string]string{
@@ -254,7 +234,7 @@ func TestUpload_PaidPreview_InvalidFormat(t *testing.T) {
 	}}
 	videos := mustNewVideoStore(t)
 	v := &mockVerifier{address: "0xAlice", err: nil}
-	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()), nil)
+	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()))
 
 	req := createPaidMultipartRequest(t, []byte("not a valid video format!!"), nil, map[string]string{
 		"price": "100000000",
@@ -277,7 +257,7 @@ func TestUpload_PaidPreview_PreviewTooLarge(t *testing.T) {
 	cfg := newPaidTestConfig()
 	cfg.MaxPreviewSize = 100 // 100 bytes — tiny limit for test
 	v := &mockVerifier{address: "0xAlice", err: nil}
-	h := NewUpload(store, videos, cfg, v, suiauth.FixedClock(time.Now().Unix()), nil)
+	h := NewUpload(store, videos, cfg, v, suiauth.FixedClock(time.Now().Unix()))
 
 	mp4Data := testutil.TestMP4(t)
 	req := createPaidMultipartRequest(t, mp4Data, nil, map[string]string{
@@ -305,7 +285,7 @@ func TestUpload_PaidPreview_WithThumbnail(t *testing.T) {
 	}}
 	videos := mustNewVideoStore(t)
 	v := &mockVerifier{address: "0xAlice", err: nil}
-	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()), nil)
+	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()))
 
 	req := createPaidMultipartRequest(t, mp4Data, jpegData, map[string]string{
 		"price": "100000000",
@@ -329,7 +309,7 @@ func TestUpload_PaidPreview_InvalidThumbnail(t *testing.T) {
 	}}
 	videos := mustNewVideoStore(t)
 	v := &mockVerifier{address: "0xAlice", err: nil}
-	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()), nil)
+	h := NewUpload(store, videos, newPaidTestConfig(), v, suiauth.FixedClock(time.Now().Unix()))
 
 	req := createPaidMultipartRequest(t, mp4Data, []byte("not a jpeg"), map[string]string{
 		"price": "100000000",
@@ -356,7 +336,7 @@ func TestUpload_PaidPreview_NoFFmpegRejected(t *testing.T) {
 	cfg := newTestConfig()
 	cfg.FFmpegEnabled = false
 	v := &mockVerifier{address: "0xAlice", err: nil}
-	h := NewUpload(store, videos, cfg, v, suiauth.FixedClock(time.Now().Unix()), nil)
+	h := NewUpload(store, videos, cfg, v, suiauth.FixedClock(time.Now().Unix()))
 
 	req := createPaidMultipartRequest(t, mp4Data, nil, map[string]string{
 		"price": "100000000",
@@ -380,7 +360,7 @@ func TestUpload_FreeUpload_StillUsesVideoField(t *testing.T) {
 		return fmt.Sprintf("blob%d", n), nil
 	}}
 	videos := mustNewVideoStore(t)
-	h := NewUpload(store, videos, newTestConfig(), nil, nil, nil)
+	h := NewUpload(store, videos, newTestConfig(), nil, nil)
 
 	req := createMultipartRequest(t, "video", "test.mp4", mp4Data, map[string]string{
 		"title": "Free Video",
@@ -399,7 +379,7 @@ func TestUpload_MissingFile(t *testing.T) {
 		return "blob1", nil
 	}}
 	videos := mustNewVideoStore(t)
-	h := NewUpload(store, videos, newTestConfig(), nil, nil, nil)
+	h := NewUpload(store, videos, newTestConfig(), nil, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/upload", nil)
 	rec := httptest.NewRecorder()

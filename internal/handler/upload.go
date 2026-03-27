@@ -32,11 +32,10 @@ type Upload struct {
 	cfg      *config.Config
 	verifier SigVerifier
 	clock    suiauth.Clock
-	sessions *SessionStore
 }
 
-func NewUpload(w Storer, videos *model.VideoStore, cfg *config.Config, verifier SigVerifier, clock suiauth.Clock, sessions *SessionStore) *Upload {
-	return &Upload{walrus: w, videos: videos, cfg: cfg, verifier: verifier, clock: clock, sessions: sessions}
+func NewUpload(w Storer, videos *model.VideoStore, cfg *config.Config, verifier SigVerifier, clock suiauth.Clock) *Upload {
+	return &Upload{walrus: w, videos: videos, cfg: cfg, verifier: verifier, clock: clock}
 }
 
 func (h *Upload) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -128,23 +127,25 @@ func (h *Upload) handleFreeUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Upload) handlePaidUpload(w http.ResponseWriter, r *http.Request, price uint64) {
-	auth := extractAndVerifyWalletAuth(r, h.verifier, h.clock, "upload", "")
-	if auth.err != "" {
-		writeJSON(w, auth.status, map[string]string{"error": auth.err})
-		return
+	// Optionally extract creator from wallet auth headers (not required).
+	// On-chain create_video already verifies wallet ownership.
+	var creator string
+	if auth := extractAndVerifyWalletAuth(r, h.verifier, h.clock, "upload", ""); auth.err == "" {
+		creator = auth.address
 	}
 
 	if !h.cfg.FFmpegEnabled {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "paid uploads require ffmpeg/ffprobe to validate preview duration"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "paid uploads require ffmpeg to generate previews"})
 		return
 	}
 
-	if _, reqErr := parsePreviewDuration(r, h.cfg); reqErr != nil {
+	previewDuration, reqErr := parsePreviewDuration(r, h.cfg)
+	if reqErr != nil {
 		writeJSON(w, reqErr.status, map[string]string{"error": reqErr.msg})
 		return
 	}
 
-	previewData, thumbnailData, title, reqErr := h.parsePaidRequest(r)
+	data, title, reqErr := h.parsePaidRequest(r)
 	if reqErr != nil {
 		writeJSON(w, reqErr.status, map[string]string{"error": reqErr.msg})
 		return
@@ -155,22 +156,18 @@ func (h *Upload) handlePaidUpload(w http.ResponseWriter, r *http.Request, price 
 		title = id
 	}
 
-	h.videos.Create(id, title, price, auth.address)
+	h.videos.Create(id, title, price, creator)
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), uploadTimeout)
 		defer cancel()
-		h.processAndUploadPaid(ctx, id, previewData, thumbnailData)
+		h.processAndUploadPaid(ctx, id, data, previewDuration)
 	}()
 
-	resp := map[string]any{
+	writeJSON(w, http.StatusAccepted, map[string]any{
 		"id":     id,
 		"status": model.StatusProcessing,
-	}
-	if h.sessions != nil {
-		resp["session_token"] = h.sessions.Create(auth.address)
-	}
-	writeJSON(w, http.StatusAccepted, resp)
+	})
 }
 
 func (h *Upload) parseFreeRequest(r *http.Request) ([]byte, string, *requestError) {
@@ -196,51 +193,42 @@ func (h *Upload) parseFreeRequest(r *http.Request) ([]byte, string, *requestErro
 	return data, r.FormValue("title"), nil
 }
 
-func (h *Upload) parsePaidRequest(r *http.Request) ([]byte, []byte, string, *requestError) {
-	file, header, err := r.FormFile("preview")
+func (h *Upload) parsePaidRequest(r *http.Request) ([]byte, string, *requestError) {
+	file, header, err := r.FormFile("video")
 	if err != nil {
-		return nil, nil, "", &requestError{http.StatusBadRequest, "paid uploads require a 'preview' field (short video clip generated client-side)"}
+		return nil, "", &requestError{http.StatusBadRequest, "paid uploads require a 'video' field"}
 	}
 	defer file.Close()
 
-	if err := processor.ValidateSize(header.Size, h.cfg.MaxPreviewSize); err != nil {
-		return nil, nil, "", &requestError{http.StatusRequestEntityTooLarge, err.Error()}
+	if err := processor.ValidateSize(header.Size, h.cfg.MaxFileSize); err != nil {
+		return nil, "", &requestError{http.StatusRequestEntityTooLarge, err.Error()}
 	}
 
-	previewData, err := io.ReadAll(file)
+	data, err := io.ReadAll(file)
 	if err != nil {
-		return nil, nil, "", &requestError{http.StatusBadRequest, "failed to read preview file"}
+		return nil, "", &requestError{http.StatusBadRequest, "failed to read video file"}
 	}
 
-	if err := processor.ValidateMagicBytes(bytes.NewReader(previewData)); err != nil {
-		return nil, nil, "", &requestError{http.StatusBadRequest, "invalid preview format: supported formats are MP4, MOV, WebM, MKV, AVI"}
+	if err := processor.ValidateMagicBytes(bytes.NewReader(data)); err != nil {
+		return nil, "", &requestError{http.StatusBadRequest, "invalid video format: supported formats are MP4, MOV, WebM, MKV, AVI"}
 	}
 
-	var thumbnailData []byte
-	if thumbFile, _, thumbErr := r.FormFile("thumbnail"); thumbErr == nil {
-		defer thumbFile.Close()
-		thumbData, readErr := io.ReadAll(thumbFile)
-		if readErr != nil {
-			return nil, nil, "", &requestError{http.StatusBadRequest, "failed to read thumbnail file"}
-		}
-		if err := processor.ValidateJPEGMagicBytes(bytes.NewReader(thumbData)); err != nil {
-			return nil, nil, "", &requestError{http.StatusBadRequest, "invalid thumbnail format: expected JPEG"}
-		}
-		thumbnailData = thumbData
-	}
-
-	return previewData, thumbnailData, r.FormValue("title"), nil
+	return data, r.FormValue("title"), nil
 }
 
 // processAndUploadPaid handles async processing for paid video uploads.
-// The preview and thumbnail are already validated and provided by the frontend.
-func (h *Upload) processAndUploadPaid(ctx context.Context, id string, previewData, thumbnailData []byte) {
-	if h.cfg.FFmpegEnabled {
-		if err := processor.ValidatePreviewDuration(previewData, h.cfg.MaxPreviewDuration, h.cfg.FFprobePath); err != nil {
-			slog.Error("preview duration validation failed", "id", id, "error", err)
-			h.videos.SetFailed(id, err.Error())
-			return
-		}
+// The backend extracts preview/thumbnail from the full video.
+func (h *Upload) processAndUploadPaid(ctx context.Context, id string, data []byte, previewDuration int) {
+	previewData, err := processor.ExtractPreview(data, previewDuration, h.cfg.FFmpegPath)
+	if err != nil {
+		slog.Error("preview extraction failed", "id", id, "error", err)
+		h.videos.SetFailed(id, "preview extraction failed: "+err.Error())
+		return
+	}
+
+	thumbnailData, err := processor.ExtractThumbnail(data, h.cfg.FFmpegPath)
+	if err != nil {
+		slog.Warn("thumbnail extraction failed, continuing without thumbnail", "id", id, "error", err)
 	}
 
 	thumbBlobID, thumbBlobURL := h.uploadThumbnail(ctx, id, thumbnailData)

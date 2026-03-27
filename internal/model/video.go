@@ -32,22 +32,26 @@ type Video struct {
 	FullBlobURL      string `json:"full_blob_url,omitempty"`
 	Encrypted      bool   `json:"encrypted"`
 	SuiObjectID    string `json:"sui_object_id,omitempty"`
+	Deleted        bool   `json:"deleted,omitempty"`
+	DeletedAt      string `json:"deleted_at,omitempty"`
 	Error          string `json:"error,omitempty"`
 }
 
 type VideoStore struct {
-	mu          sync.RWMutex
-	videos      map[string]*Video
-	byObjectID  map[string]*Video // secondary index: sui_object_id → *Video
-	filePath    string
-	subscribers map[string][]chan Video
+	mu              sync.RWMutex
+	videos          map[string]*Video
+	byObjectID      map[string]*Video // secondary index: sui_object_id → *Video
+	byPreviewBlobID map[string]*Video // secondary index: preview_blob_id → *Video
+	filePath        string
+	subscribers     map[string][]chan Video
 }
 
 func NewVideoStore(dataDir string) (*VideoStore, error) {
 	s := &VideoStore{
-		videos:      make(map[string]*Video),
-		byObjectID:  make(map[string]*Video),
-		subscribers: make(map[string][]chan Video),
+		videos:          make(map[string]*Video),
+		byObjectID:      make(map[string]*Video),
+		byPreviewBlobID: make(map[string]*Video),
+		subscribers:     make(map[string][]chan Video),
 	}
 
 	if dataDir != "" {
@@ -102,7 +106,7 @@ func (s *VideoStore) SubscribeIfProcessing(id string) (<-chan Video, *Video, boo
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	v, ok := s.videos[id]
-	if !ok {
+	if !ok || v.Deleted {
 		return nil, nil, false
 	}
 	copied := *v
@@ -127,7 +131,7 @@ func (s *VideoStore) ResolveAndSubscribeIfProcessing(id string) (<-chan Video, *
 		v, ok = s.byObjectID[id]
 		canonical = true
 	}
-	if !ok {
+	if !ok || v.Deleted {
 		return nil, nil, false, false
 	}
 
@@ -177,7 +181,7 @@ func (s *VideoStore) Get(id string) (*Video, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	v, ok := s.videos[id]
-	if !ok {
+	if !ok || v.Deleted {
 		return nil, false
 	}
 	copied := *v
@@ -189,7 +193,7 @@ func (s *VideoStore) GetBySuiObjectID(objectID string) (*Video, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	v, ok := s.byObjectID[objectID]
-	if !ok {
+	if !ok || v.Deleted {
 		return nil, false
 	}
 	copied := *v
@@ -202,10 +206,16 @@ func (s *VideoStore) Resolve(id string) (video *Video, canonical bool, found boo
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if v, ok := s.videos[id]; ok {
+		if v.Deleted {
+			return nil, false, false
+		}
 		copied := *v
 		return &copied, false, true
 	}
 	if v, ok := s.byObjectID[id]; ok {
+		if v.Deleted {
+			return nil, false, false
+		}
 		copied := *v
 		return &copied, true, true
 	}
@@ -216,6 +226,9 @@ func (s *VideoStore) SetReady(id, thumbnailBlobID, thumbnailBlobURL, previewBlob
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if v, ok := s.videos[id]; ok {
+		if v.Deleted {
+			return
+		}
 		v.Status = StatusReady
 		v.ThumbnailBlobID = thumbnailBlobID
 		v.ThumbnailBlobURL = thumbnailBlobURL
@@ -223,6 +236,9 @@ func (s *VideoStore) SetReady(id, thumbnailBlobID, thumbnailBlobURL, previewBlob
 		v.PreviewBlobURL = previewBlobURL
 		v.FullBlobID = fullBlobID
 		v.FullBlobURL = fullBlobURL
+		if previewBlobID != "" {
+			s.byPreviewBlobID[previewBlobID] = v
+		}
 		s.persist()
 		s.notify(id)
 	}
@@ -230,15 +246,21 @@ func (s *VideoStore) SetReady(id, thumbnailBlobID, thumbnailBlobURL, previewBlob
 
 // SetPreviewUploaded stores the preview and thumbnail blob IDs for a paid video
 // while keeping the status as "processing". The video transitions to "ready"
-// only when SetSuiObjectID is called after on-chain publish.
+// when the chain watcher detects the VideoCreated event via MatchAndLinkChainVideo.
 func (s *VideoStore) SetPreviewUploaded(id, thumbnailBlobID, thumbnailBlobURL, previewBlobID, previewBlobURL string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if v, ok := s.videos[id]; ok {
+		if v.Deleted {
+			return
+		}
 		v.ThumbnailBlobID = thumbnailBlobID
 		v.ThumbnailBlobURL = thumbnailBlobURL
 		v.PreviewBlobID = previewBlobID
 		v.PreviewBlobURL = previewBlobURL
+		if previewBlobID != "" {
+			s.byPreviewBlobID[previewBlobID] = v
+		}
 		s.persist()
 		s.notify(id)
 	}
@@ -248,7 +270,7 @@ func (s *VideoStore) SetSuiObjectID(id, suiObjectID, fullBlobID, fullBlobURL str
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	v, ok := s.videos[id]
-	if !ok {
+	if !ok || v.Deleted {
 		return false
 	}
 	v.SuiObjectID = suiObjectID
@@ -269,6 +291,9 @@ func (s *VideoStore) SetFailed(id string, errMsg string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if v, ok := s.videos[id]; ok {
+		if v.Deleted {
+			return
+		}
 		v.Status = StatusFailed
 		v.Error = errMsg
 		s.persist()
@@ -283,26 +308,72 @@ func (s *VideoStore) Delete(id string) bool {
 	if !ok {
 		return false
 	}
-	if v.SuiObjectID != "" {
-		delete(s.byObjectID, v.SuiObjectID)
+	if v.PreviewBlobID != "" {
+		delete(s.byPreviewBlobID, v.PreviewBlobID)
 	}
-	delete(s.videos, id)
+	if v.Deleted {
+		return false
+	}
+	v.Deleted = true
+	v.DeletedAt = time.Now().UTC().Format(time.RFC3339)
 	s.persist()
 	return true
+}
+
+// PruneMissingChain marks videos as deleted if they are no longer present on-chain.
+// existing should contain all on-chain sui_object_id values.
+func (s *VideoStore) PruneMissingChain(existing map[string]struct{}) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if existing == nil {
+		return 0
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	pruned := 0
+	for _, v := range s.videos {
+		if v.Deleted || v.SuiObjectID == "" {
+			continue
+		}
+		if _, ok := existing[v.SuiObjectID]; ok {
+			continue
+		}
+		v.Deleted = true
+		v.DeletedAt = now
+		if v.PreviewBlobID != "" {
+			delete(s.byPreviewBlobID, v.PreviewBlobID)
+		}
+		pruned++
+	}
+	if pruned > 0 {
+		s.persist()
+	}
+	return pruned
 }
 
 // UpsertFromChain creates or updates a video entry from on-chain data.
 // If a video with the given sui_object_id already exists, it updates blob IDs.
 // Otherwise, it creates a new entry using the sui_object_id as the video ID.
 // Returns true if a new entry was created.
-func (s *VideoStore) UpsertFromChain(suiObjectID string, price uint64, creator, previewBlobID, previewBlobURL, fullBlobID, fullBlobURL string) bool {
+func (s *VideoStore) UpsertFromChain(suiObjectID, title string, price uint64, creator, thumbnailBlobID, thumbnailBlobURL, previewBlobID, previewBlobURL, fullBlobID, fullBlobURL string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	// Check if we already have this object indexed.
 	if v, ok := s.byObjectID[suiObjectID]; ok {
-		// Update blob IDs if they were missing locally.
+		if v.Deleted {
+			return false
+		}
+		// Update fields if they were missing locally.
 		changed := false
+		if v.Title == "" && title != "" {
+			v.Title = title
+			changed = true
+		}
+		if v.ThumbnailBlobID == "" && thumbnailBlobID != "" {
+			v.ThumbnailBlobID = thumbnailBlobID
+			v.ThumbnailBlobURL = thumbnailBlobURL
+			changed = true
+		}
 		if v.PreviewBlobID == "" && previewBlobID != "" {
 			v.PreviewBlobID = previewBlobID
 			v.PreviewBlobURL = previewBlobURL
@@ -321,21 +392,128 @@ func (s *VideoStore) UpsertFromChain(suiObjectID string, price uint64, creator, 
 
 	// Create a new entry using sui_object_id as both the ID and the object reference.
 	v := &Video{
-		ID:              suiObjectID,
-		Title:           "",
-		Status:          StatusReady,
-		CreatedAt:       time.Now().UTC().Format(time.RFC3339),
-		Price:           price,
-		Creator:         creator,
-		Encrypted:       price > 0,
-		SuiObjectID:     suiObjectID,
-		PreviewBlobID:   previewBlobID,
-		PreviewBlobURL:  previewBlobURL,
-		FullBlobID:      fullBlobID,
-		FullBlobURL:     fullBlobURL,
+		ID:               suiObjectID,
+		Title:            title,
+		Status:           StatusReady,
+		CreatedAt:        time.Now().UTC().Format(time.RFC3339),
+		Price:            price,
+		Creator:          creator,
+		Encrypted:        price > 0,
+		SuiObjectID:      suiObjectID,
+		ThumbnailBlobID:  thumbnailBlobID,
+		ThumbnailBlobURL: thumbnailBlobURL,
+		PreviewBlobID:    previewBlobID,
+		PreviewBlobURL:   previewBlobURL,
+		FullBlobID:       fullBlobID,
+		FullBlobURL:      fullBlobURL,
 	}
 	s.videos[suiObjectID] = v
 	s.byObjectID[suiObjectID] = v
+	s.persist()
+	return true
+}
+
+// MatchAndLinkChainVideo links an on-chain Video to a local entry by matching
+// preview_blob_id. If no local match exists, creates a new ready entry.
+// blobURLFn converts a blob ID to its aggregator URL.
+func (s *VideoStore) MatchAndLinkChainVideo(suiObjectID, title string, price uint64, creator, previewBlobID, fullBlobID string, blobURLFn func(string) string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Already indexed — update missing blob IDs, title, and creator if needed.
+	if v, ok := s.byObjectID[suiObjectID]; ok {
+		if v.Deleted {
+			return
+		}
+		changed := false
+		if v.Title == "" && title != "" {
+			v.Title = title
+			changed = true
+		}
+		if v.FullBlobID == "" && fullBlobID != "" {
+			v.FullBlobID = fullBlobID
+			v.FullBlobURL = blobURLFn(fullBlobID)
+			changed = true
+		}
+		if v.PreviewBlobID == "" && previewBlobID != "" {
+			v.PreviewBlobID = previewBlobID
+			v.PreviewBlobURL = blobURLFn(previewBlobID)
+			s.byPreviewBlobID[previewBlobID] = v
+			changed = true
+		}
+		if v.Creator == "" && creator != "" {
+			v.Creator = creator
+			changed = true
+		}
+		if changed {
+			s.persist()
+		}
+		return
+	}
+
+	// Match by preview_blob_id to link to an existing upload entry.
+	if previewBlobID != "" {
+		if v, ok := s.byPreviewBlobID[previewBlobID]; ok {
+			if v.Deleted {
+				return
+			}
+			v.SuiObjectID = suiObjectID
+			s.byObjectID[suiObjectID] = v
+			if v.Title == "" && title != "" {
+				v.Title = title
+			}
+			if fullBlobID != "" {
+				v.FullBlobID = fullBlobID
+				v.FullBlobURL = blobURLFn(fullBlobID)
+			}
+			if v.Creator == "" && creator != "" {
+				v.Creator = creator
+			}
+			if v.Status == StatusProcessing {
+				v.Status = StatusReady
+				s.notify(v.ID)
+			}
+			s.persist()
+			return
+		}
+	}
+
+	// No local match — create a new entry from chain data.
+	v := &Video{
+		ID:             suiObjectID,
+		Title:          title,
+		Status:         StatusReady,
+		CreatedAt:      time.Now().UTC().Format(time.RFC3339),
+		Price:          price,
+		Creator:        creator,
+		Encrypted:      price > 0,
+		SuiObjectID:    suiObjectID,
+		PreviewBlobID:  previewBlobID,
+		PreviewBlobURL: blobURLFn(previewBlobID),
+		FullBlobID:     fullBlobID,
+		FullBlobURL:    blobURLFn(fullBlobID),
+	}
+	s.videos[suiObjectID] = v
+	s.byObjectID[suiObjectID] = v
+	if previewBlobID != "" {
+		s.byPreviewBlobID[previewBlobID] = v
+	}
+	s.persist()
+}
+
+// DeleteBySuiObjectID marks a video as deleted by its on-chain object ID.
+func (s *VideoStore) DeleteBySuiObjectID(suiObjectID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, ok := s.byObjectID[suiObjectID]
+	if !ok || v.Deleted {
+		return false
+	}
+	if v.PreviewBlobID != "" {
+		delete(s.byPreviewBlobID, v.PreviewBlobID)
+	}
+	v.Deleted = true
+	v.DeletedAt = time.Now().UTC().Format(time.RFC3339)
 	s.persist()
 	return true
 }
@@ -345,6 +523,9 @@ func (s *VideoStore) List() []Video {
 	defer s.mu.RUnlock()
 	result := make([]Video, 0, len(s.videos))
 	for _, v := range s.videos {
+		if v.Deleted {
+			continue
+		}
 		result = append(result, *v)
 	}
 	return result
@@ -373,6 +554,9 @@ func (s *VideoStore) load() error {
 		s.videos[v.ID] = v
 		if v.SuiObjectID != "" {
 			s.byObjectID[v.SuiObjectID] = v
+		}
+		if v.PreviewBlobID != "" && !v.Deleted {
+			s.byPreviewBlobID[v.PreviewBlobID] = v
 		}
 	}
 	if staleCount > 0 {

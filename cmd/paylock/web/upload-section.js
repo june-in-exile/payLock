@@ -4,7 +4,7 @@ import {
   formatFileSize, stageNewFile, clearStagedFile,
   loadWallet, walletState,
 } from './state.js';
-import { signForAuth, setAuthHeaders, isWalletConnected } from './wallet.js';
+import { isWalletConnected, signForAuth, setAuthHeaders } from './wallet.js';
 
 function stepCls(status) {
   return 'upload-step ' + (status || 'pending');
@@ -12,12 +12,13 @@ function stepCls(status) {
 
 function UploadSteps({ step, previewDone, browserStep }) {
   const isOnchain = step === 'onchain';
+  const isConfirming = step === 'confirming';
   const allDone = step === 'allDone';
 
-  const previewStatus = (previewDone || isOnchain || allDone) ? 'done' : 'active';
+  const previewStatus = (previewDone || isOnchain || isConfirming || allDone) ? 'done' : 'active';
 
   let encryptStatus, walrusStatus;
-  if (isOnchain || allDone) {
+  if (isOnchain || isConfirming || allDone) {
     encryptStatus = 'done';
     walrusStatus = 'done';
   } else if (browserStep === 'encrypt') {
@@ -31,7 +32,8 @@ function UploadSteps({ step, previewDone, browserStep }) {
     walrusStatus = 'done';
   }
 
-  const onchainStatus = allDone ? 'done' : isOnchain ? 'active' : 'pending';
+  const onchainStatus = (isConfirming || allDone) ? 'done' : isOnchain ? 'active' : 'pending';
+  const confirmStatus = allDone ? 'done' : isConfirming ? 'active' : 'pending';
 
   return html`
     <div class="upload-steps">
@@ -59,6 +61,10 @@ function UploadSteps({ step, previewDone, browserStep }) {
       <div class=${stepCls(onchainStatus)}>
         <span class="upload-step-icon"></span>
         <span>Creating video on-chain</span>
+      </div>
+      <div class=${stepCls(confirmStatus)}>
+        <span class="upload-step-icon"></span>
+        <span>Waiting for chain confirmation</span>
       </div>
     </div>
   `;
@@ -194,6 +200,7 @@ function updatePreviewControls() {
     }
     hint.textContent = parts.join(' • ');
   }
+  syncPreviewDisabled();
 }
 
 async function fetchPreviewConfig() {
@@ -255,82 +262,33 @@ export function detectVideoDuration(file) {
   });
 }
 
+function isPaidPrice() {
+  const el = document.getElementById('video-price');
+  if (!el) return false;
+  const val = parseFloat(el.value);
+  return Number.isFinite(val) && val > 0;
+}
+
+function syncPreviewDisabled() {
+  const paid = isPaidPrice();
+  const range = document.getElementById('preview-duration-range');
+  const number = document.getElementById('preview-duration');
+  const hint = document.getElementById('preview-duration-hint');
+  const label = document.querySelector('label[for="preview-duration"]');
+  const opacity = paid ? '1' : '0.4';
+
+  if (range) { range.disabled = !paid; range.style.opacity = opacity; }
+  if (number) { number.disabled = !paid; number.style.opacity = opacity; }
+  if (hint) hint.style.opacity = opacity;
+  if (label) label.style.opacity = opacity;
+}
+
 function readPreviewDuration() {
   const input = document.getElementById('preview-duration');
   if (!input) return previewDurationDefault;
   const sec = parseInt(input.value, 10);
   if (Number.isNaN(sec)) return null;
   return sec;
-}
-
-function generatePreview(file) {
-  return new Promise((resolve, reject) => {
-    const video = document.createElement('video');
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = 'auto';
-
-    const objectUrl = URL.createObjectURL(file);
-    video.src = objectUrl;
-
-    const cleanup = () => URL.revokeObjectURL(objectUrl);
-
-    video.addEventListener('error', () => {
-      cleanup();
-      reject(new Error('Failed to load video for preview generation'));
-    });
-
-    video.addEventListener('loadedmetadata', () => {
-      const clipDuration = Math.min(video.duration, previewDurationSec);
-
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-
-      const stream = canvas.captureStream();
-      const audioTracks = video.captureStream ? video.captureStream().getAudioTracks() : [];
-      for (const track of audioTracks) stream.addTrack(track);
-
-      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-        ? 'video/webm;codecs=vp9,opus'
-        : 'video/webm';
-      const recorder = new MediaRecorder(stream, { mimeType });
-      const chunks = [];
-
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-
-      recorder.onstop = () => {
-        cleanup();
-        const blob = new Blob(chunks, { type: mimeType });
-        const previewFile = new File([blob], 'preview.webm', { type: mimeType });
-        resolve(previewFile);
-      };
-
-      recorder.onerror = () => {
-        cleanup();
-        reject(new Error('Preview recording failed'));
-      };
-
-      video.addEventListener('seeked', () => {
-        video.play();
-        recorder.start();
-
-        const drawFrame = () => {
-          if (video.currentTime >= clipDuration || video.ended) {
-            recorder.stop();
-            video.pause();
-            return;
-          }
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          requestAnimationFrame(drawFrame);
-        };
-        requestAnimationFrame(drawFrame);
-      }, { once: true });
-
-      video.currentTime = 0;
-    });
-  });
 }
 
 function pollFallback(id) {
@@ -377,17 +335,19 @@ async function confirmUpload(fileInput) {
   const staged = stagedFile.value;
   if (!staged) return;
 
-  const previewDuration = readPreviewDuration();
-  if (previewDuration === null || previewDuration < previewDurationMin || previewDuration > previewDurationMax) {
-    showToast('error', `Preview length must be between ${previewDurationMin}s and ${previewDurationMax}s.`, 5000);
-    return;
-  }
-  previewDurationSec = previewDuration;
-
   const priceInput = document.getElementById('video-price').value;
   let priceMist = 0;
   if (priceInput && parseFloat(priceInput) > 0) {
     priceMist = Math.round(parseFloat(priceInput) * 1_000_000_000);
+  }
+
+  if (priceMist > 0) {
+    const previewDuration = readPreviewDuration();
+    if (previewDuration === null || previewDuration < previewDurationMin || previewDuration > previewDurationMax) {
+      showToast('error', `Preview length must be between ${previewDurationMin}s and ${previewDurationMax}s.`, 5000);
+      return;
+    }
+    previewDurationSec = previewDuration;
   }
   if (priceMist > 0 && !walletState.value.connected) {
     showToast('error', 'Please connect your wallet before uploading a paid video.', 5000);
@@ -397,35 +357,28 @@ async function confirmUpload(fileInput) {
   const file = staged.file;
   const fileArrayBuffer = priceMist > 0 ? await file.arrayBuffer() : null;
 
-  let previewFile = null;
-  if (priceMist > 0) {
-    uploadState.value = { active: true, percent: 0, text: 'Generating preview clip...', step: null, showSpinner: true, showSteps: false };
-    try {
-      previewFile = await generatePreview(file);
-    } catch (err) {
-      uploadState.value = { active: false, percent: 0, text: '', step: null, showSpinner: false, showSteps: false };
-      showToast('error', 'Failed to generate preview: ' + err.message, 5000);
-      return;
-    }
-  }
-
   uploadState.value = { active: true, percent: 0, text: 'Uploading ' + file.name + '...', step: null, showSpinner: false, showSteps: false };
 
   const formData = new FormData();
-  formData.append(priceMist > 0 ? 'preview' : 'video', previewFile || file);
+  formData.append('video', file);
   formData.append('preview_duration', previewDurationSec.toString());
   const title = document.getElementById('video-title').value;
   if (title) formData.append('title', title);
   if (priceMist > 0) formData.append('price', priceMist.toString());
 
+  let data = null;
   let authHeaders = null;
   if (isWalletConnected()) {
-    const auth = await signForAuth('upload', '');
-    authHeaders = {};
-    setAuthHeaders(authHeaders, auth);
+    try {
+      const auth = await signForAuth('upload', '');
+      authHeaders = {};
+      setAuthHeaders(authHeaders, auth);
+    } catch (err) {
+      showToast('error', 'Wallet signature failed: ' + err.message, 5000);
+      uploadState.value = { active: false, percent: 0, text: '', step: null, showSpinner: false, showSteps: false };
+      return;
+    }
   }
-
-  let data = null;
   try {
     data = await sendUpload(formData, file.name, authHeaders);
 
@@ -448,7 +401,10 @@ async function confirmUpload(fileInput) {
       ]);
 
       uploadState.value = { ...uploadState.value, step: 'onchain', previewDone: true, browserStep: 'done', text: 'Creating video on-chain...' };
-      const suiObjectId = await mod.createVideoOnChain(data.id, priceMist, video.preview_blob_id, encResult.fullBlobId, encResult.namespace, data.session_token);
+      const videoTitle = document.getElementById('video-title').value || '';
+      const suiObjectId = await mod.createVideoOnChain(data.id, videoTitle, priceMist, video.thumbnail_blob_id || '', video.preview_blob_id, encResult.fullBlobId, encResult.namespace);
+      uploadState.value = { ...uploadState.value, step: 'confirming', text: 'Waiting for chain confirmation...' };
+      await pollUntilReady(data.id);
       navigateId = suiObjectId;
     } else {
       uploadState.value = { ...uploadState.value, showSpinner: true, text: 'Processing video...' };
@@ -512,6 +468,10 @@ export function UploadSection() {
     if (number) number.value = val;
   }, []);
 
+  const onPriceInput = useCallback(() => {
+    syncPreviewDisabled();
+  }, []);
+
   const onPreviewNumberInput = useCallback((e) => {
     const val = parseInt(e.target.value, 10);
     if (Number.isNaN(val)) return;
@@ -535,10 +495,11 @@ export function UploadSection() {
           Price in SUI (0 = free)
         </label>
         <input type="number" id="video-price" placeholder="0" min="0" step="0.01"
-          class="form-input" style="margin-bottom: 1rem;" />
+          class="form-input" style="margin-bottom: 1rem;" oninput=${onPriceInput} />
 
         <label for="preview-duration" style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
-          Preview length (seconds)
+          Preview length (seconds)${' '}
+          <span style="font-size: 0.75rem; opacity: 0.7;">— set price > 0 to enable</span>
         </label>
         <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.35rem;">
           <input

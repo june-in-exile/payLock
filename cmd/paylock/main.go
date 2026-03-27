@@ -19,6 +19,7 @@ import (
 	"github.com/anthropics/paylock/internal/processor"
 	"github.com/anthropics/paylock/internal/suiauth"
 	"github.com/anthropics/paylock/internal/walrus"
+	"github.com/anthropics/paylock/internal/watcher"
 )
 
 //go:embed web
@@ -31,13 +32,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if cfg.FFmpegEnabled {
-		if err := processor.CheckFFmpeg(cfg.FFmpegPath); err != nil {
-			slog.Error("ffmpeg is required but not found", "error", err)
-			os.Exit(1)
-		}
-	} else {
-		slog.Info("ffmpeg disabled; skipping preview/thumbnail processing")
+	if !cfg.FFmpegEnabled {
+		slog.Error("ffmpeg is required; set PAYLOCK_ENABLE_FFMPEG=true")
+		os.Exit(1)
+	}
+	if err := processor.CheckFFmpeg(cfg.FFmpegPath); err != nil {
+		slog.Error("ffmpeg is required but not found", "error", err)
+		os.Exit(1)
 	}
 
 	wc := walrus.NewClient(cfg.WalrusPublisher, cfg.WalrusAggregator)
@@ -64,30 +65,36 @@ func main() {
 			return
 		}
 
+		existing := make(map[string]struct{}, len(chainVideos))
 		created := 0
 		for _, cv := range chainVideos {
+			existing[cv.ObjectID] = struct{}{}
+			thumbnailURL := wc.BlobURL(cv.ThumbnailBlobID)
 			previewURL := wc.BlobURL(cv.PreviewBlobID)
 			fullURL := wc.BlobURL(cv.FullBlobID)
-			if videos.UpsertFromChain(cv.ObjectID, cv.Price, cv.Creator, cv.PreviewBlobID, previewURL, cv.FullBlobID, fullURL) {
+			if videos.UpsertFromChain(cv.ObjectID, cv.Title, cv.Price, cv.Creator, cv.ThumbnailBlobID, thumbnailURL, cv.PreviewBlobID, previewURL, cv.FullBlobID, fullURL) {
 				created++
 			}
 		}
-		slog.Info("startup reindex complete", "chain_total", len(chainVideos), "new_entries", created)
+		pruned := videos.PruneMissingChain(existing)
+		slog.Info("startup reindex complete", "chain_total", len(chainVideos), "new_entries", created, "pruned", pruned)
 	}()
+
+	// Chain event watcher — polls for VideoCreated events and links them to local entries
+	w := watcher.New(cfg.SuiRPCURL, cfg.GatingPackageID, videos, wc.BlobURL, cfg.WatcherInterval)
+	go w.Run(ctx)
 
 	sigVerifier := suiauth.New()
 	clock := suiauth.SystemClock()
-	sessions := handler.NewSessionStore(15 * time.Minute)
 
 	mux := http.NewServeMux()
 
 	// API routes
-	mux.Handle("POST /api/upload", handler.NewUpload(wc, videos, cfg, sigVerifier, clock, sessions))
+	mux.Handle("POST /api/upload", handler.NewUpload(wc, videos, cfg, sigVerifier, clock))
 	mux.Handle("GET /api/status/{id}", handler.NewStatus(videos))
 	mux.Handle("GET /api/status/{id}/events", handler.NewStatusEvents(videos))
 	mux.Handle("GET /api/videos", handler.NewVideos(videos))
 	mux.Handle("DELETE /api/videos/{id}", handler.NewDelete(videos, sigVerifier, clock))
-	mux.Handle("PUT /api/videos/{id}", handler.NewSetSuiObject(videos, wc, sigVerifier, clock, sessions))
 	mux.Handle("GET /api/config", handler.NewAppConfig(cfg))
 	mux.Handle("POST /api/reindex", handler.NewReindex(idx, videos, wc.BlobURL, cfg.AdminSecret))
 

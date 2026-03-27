@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -180,133 +179,7 @@ func TestDelete_ExpiredTimestamp(t *testing.T) {
 	}
 }
 
-// --- SetSuiObject tests ---
-
-func TestSetSuiObject_RequiresCreatorAuth(t *testing.T) {
-	videos := mustNewVideoStore(t)
-	videos.Create("vid-001", "Test", 100, "0xAlice")
-	videos.SetReady("vid-001", "", "", "prev1", "https://agg/prev1", "", "")
-
-	store := &mockStorer{storeFunc: func(data []byte, epochs int) (string, error) {
-		return "blob1", nil
-	}}
-	v := &mockVerifier{address: "0xBob", err: nil}
-	h := NewSetSuiObject(videos, store, v, suiauth.FixedClock(time.Now().Unix()), nil)
-
-	body := `{"sui_object_id":"0xOBJ1","full_blob_id":"blob99"}`
-	req := httptest.NewRequest(http.MethodPut, "/api/videos/vid-001", strings.NewReader(body))
-	req.SetPathValue("id", "vid-001")
-	setAuthHeaders(req, "0xBob", "fakesig", nowTS())
-	rec := httptest.NewRecorder()
-
-	h.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("expected 403 for wrong creator, got %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestSetSuiObject_AllowsCorrectCreator(t *testing.T) {
-	videos := mustNewVideoStore(t)
-	videos.Create("vid-001", "Test", 100, "0xAlice")
-	videos.SetReady("vid-001", "", "", "prev1", "https://agg/prev1", "", "")
-
-	store := &mockStorer{storeFunc: func(data []byte, epochs int) (string, error) {
-		return "blob1", nil
-	}}
-	v := &mockVerifier{address: "0xAlice", err: nil}
-	h := NewSetSuiObject(videos, store, v, suiauth.FixedClock(time.Now().Unix()), nil)
-
-	body := `{"sui_object_id":"0xOBJ1","full_blob_id":"blob99"}`
-	req := httptest.NewRequest(http.MethodPut, "/api/videos/vid-001", strings.NewReader(body))
-	req.SetPathValue("id", "vid-001")
-	setAuthHeaders(req, "0xAlice", "fakesig", nowTS())
-	rec := httptest.NewRecorder()
-
-	h.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200 for correct creator, got %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestSetSuiObject_AcceptsValidSessionToken(t *testing.T) {
-	videos := mustNewVideoStore(t)
-	videos.Create("vid-001", "Test", 100, "0xAlice")
-	videos.SetReady("vid-001", "", "", "prev1", "https://agg/prev1", "", "")
-
-	store := &mockStorer{storeFunc: func(data []byte, epochs int) (string, error) {
-		return "blob1", nil
-	}}
-	sessions := NewSessionStore(15 * time.Minute)
-	token := sessions.Create("0xAlice")
-	h := NewSetSuiObject(videos, store, &mockVerifier{}, suiauth.FixedClock(time.Now().Unix()), sessions)
-
-	body := `{"sui_object_id":"0xOBJ1","full_blob_id":"blob99"}`
-	req := httptest.NewRequest(http.MethodPut, "/api/videos/vid-001", strings.NewReader(body))
-	req.SetPathValue("id", "vid-001")
-	req.Header.Set("X-Session-Token", token)
-	rec := httptest.NewRecorder()
-
-	h.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200 with valid session token, got %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestSetSuiObject_RejectsExpiredSessionToken(t *testing.T) {
-	videos := mustNewVideoStore(t)
-	videos.Create("vid-001", "Test", 100, "0xAlice")
-	videos.SetReady("vid-001", "", "", "prev1", "https://agg/prev1", "", "")
-
-	store := &mockStorer{storeFunc: func(data []byte, epochs int) (string, error) {
-		return "blob1", nil
-	}}
-	sessions := NewSessionStore(1 * time.Millisecond)
-	token := sessions.Create("0xAlice")
-	time.Sleep(5 * time.Millisecond)
-	h := NewSetSuiObject(videos, store, &mockVerifier{}, suiauth.FixedClock(time.Now().Unix()), sessions)
-
-	body := `{"sui_object_id":"0xOBJ1","full_blob_id":"blob99"}`
-	req := httptest.NewRequest(http.MethodPut, "/api/videos/vid-001", strings.NewReader(body))
-	req.SetPathValue("id", "vid-001")
-	req.Header.Set("X-Session-Token", token)
-	rec := httptest.NewRecorder()
-
-	h.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401 for expired session token, got %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestSetSuiObject_RejectsSessionTokenWrongCreator(t *testing.T) {
-	videos := mustNewVideoStore(t)
-	videos.Create("vid-001", "Test", 100, "0xAlice")
-	videos.SetReady("vid-001", "", "", "prev1", "https://agg/prev1", "", "")
-
-	store := &mockStorer{storeFunc: func(data []byte, epochs int) (string, error) {
-		return "blob1", nil
-	}}
-	sessions := NewSessionStore(15 * time.Minute)
-	token := sessions.Create("0xBob")
-	h := NewSetSuiObject(videos, store, &mockVerifier{}, suiauth.FixedClock(time.Now().Unix()), sessions)
-
-	body := `{"sui_object_id":"0xOBJ1","full_blob_id":"blob99"}`
-	req := httptest.NewRequest(http.MethodPut, "/api/videos/vid-001", strings.NewReader(body))
-	req.SetPathValue("id", "vid-001")
-	req.Header.Set("X-Session-Token", token)
-	rec := httptest.NewRecorder()
-
-	h.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("expected 403 for session token with wrong creator, got %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-// --- Pagination tests (unchanged) ---
+// --- Pagination tests ---
 
 func TestVideos_Pagination_DefaultValues(t *testing.T) {
 	videos := mustNewVideoStore(t)

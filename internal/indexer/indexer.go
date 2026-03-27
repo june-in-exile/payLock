@@ -13,11 +13,13 @@ import (
 
 // ChainVideo represents a Video object read from the Sui chain.
 type ChainVideo struct {
-	ObjectID     string
-	Price        uint64
-	Creator      string
-	PreviewBlobID string
-	FullBlobID   string
+	ObjectID         string
+	Title            string
+	Price            uint64
+	Creator          string
+	ThumbnailBlobID  string
+	PreviewBlobID    string
+	FullBlobID       string
 }
 
 // Indexer scans the Sui chain for Video objects created by the gating package.
@@ -225,8 +227,14 @@ func (idx *Indexer) fetchVideoObjects(ctx context.Context, objectIDs []string) (
 			} else if v, ok := fields["price"].(float64); ok {
 				cv.Price = uint64(v)
 			}
+			if v, ok := fields["title"].(string); ok {
+				cv.Title = v
+			}
 			if v, ok := fields["creator"].(string); ok {
 				cv.Creator = v
+			}
+			if v, ok := fields["thumbnail_blob_id"].(string); ok {
+				cv.ThumbnailBlobID = v
 			}
 			if v, ok := fields["preview_blob_id"].(string); ok {
 				cv.PreviewBlobID = v

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -25,6 +26,7 @@ type Config struct {
 	GatingPackageID        string
 	DataDir                string
 	AdminSecret            string
+	WatcherInterval        time.Duration
 }
 
 func Load() (*Config, error) {
@@ -47,6 +49,7 @@ func Load() (*Config, error) {
 		SuiRPCURL:              envOrDefault("PAYLOCK_SUI_RPC_URL", "https://fullnode.testnet.sui.io:443"),
 		GatingPackageID:        envOrDefault("PAYLOCK_GATING_PACKAGE_ID", "0xec50faf6c1bb5720d7744476282a7b22600254de3ed849808ff9aacef8ba161a"),
 		AdminSecret:            os.Getenv("PAYLOCK_ADMIN_SECRET"),
+		WatcherInterval:        5 * time.Second,
 	}
 
 	if v := os.Getenv("PAYLOCK_MAX_FILE_SIZE_MB"); v != "" {
@@ -71,6 +74,14 @@ func Load() (*Config, error) {
 			return nil, fmt.Errorf("invalid PAYLOCK_MAX_PREVIEW_SIZE_MB: %w", err)
 		}
 		cfg.MaxPreviewSize = mb * 1024 * 1024
+	}
+
+	if v := os.Getenv("PAYLOCK_WATCHER_INTERVAL"); v != "" {
+		secs, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid PAYLOCK_WATCHER_INTERVAL: %w", err)
+		}
+		cfg.WatcherInterval = time.Duration(secs) * time.Second
 	}
 
 	if v := os.Getenv("PAYLOCK_MAX_PREVIEW_DURATION"); v != "" {
