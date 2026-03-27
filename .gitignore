@@ -8,4 +8,5 @@ testdata/
 *.ts
 *.m3u8
 .env
+.DS_Store
 .claude/
