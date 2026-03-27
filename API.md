@@ -115,7 +115,11 @@ Start an async video upload. The server validates the file and begins background
 
 ### `GET /api/status/{id}`
 
+<<<<<<< HEAD
 Returns the full Video object. `{id}` can be `paylock_id` or `sui_object_id` (resolved in that order).
+=======
+Returns the full Video object. `{id}` can be `paylock_id` or `sui_object_id` (resolved in that order — `paylock_id` first because callers typically poll with it right after upload, before a `sui_object_id` exists).
+>>>>>>> 8b0d4ce (chore: remove reindex endpoint and legacy stream path)
 
 | Error | Reason |
 |-------|--------|
@@ -177,14 +181,22 @@ Delete a video record from the local store. Does **not** delete Walrus blobs or 
 
 ### `GET /stream/{id}/preview`
 
-307 redirect to the Walrus aggregator URL for the preview blob.
+307 redirect to the Walrus aggregator URL for the **preview** blob (short clip or thumbnail used for browsing).
 
 - Accepts both `paylock_id` and `sui_object_id`.
 - If accessed by `paylock_id` that has a linked `sui_object_id`, redirects to the canonical path with `Deprecation` and `Sunset: 2026-06-23` headers.
+- The preview blob is always **unencrypted** — anyone can view it without purchasing.
+
+---
 
 ### `GET /stream/{id}/full`
 
-307 redirect to the full blob URL. For paid videos this is the encrypted blob — the client decrypts it with Seal.
+307 redirect to the Walrus aggregator URL for the **full** video blob.
+
+- Accepts both `paylock_id` and `sui_object_id`.
+- If accessed by `paylock_id` that has a linked `sui_object_id`, redirects to the canonical path with `Deprecation` and `Sunset: 2026-06-23` headers.
+- **Free videos**: the full blob is unencrypted and directly playable.
+- **Paid videos**: the full blob is Seal-encrypted — the client must hold a valid `AccessPass` and decrypt it with Seal before playback.
 
 ---
 
@@ -280,6 +292,7 @@ From `contracts/sources/gating.move`:
 ## Troubleshooting
 
 **Upload stuck on `processing`**
+<<<<<<< HEAD
 - Free videos: check server logs for FFmpeg or Walrus errors.
 - Paid videos: you must call `create_video` on-chain; otherwise the watcher has nothing to link.
 
@@ -291,4 +304,21 @@ From `contracts/sources/gating.move`:
 - Walrus storage is epoch-based. Expired blobs cannot be streamed. Renewals are not yet implemented.
 
 **ID resolution**
+=======
+
+- Free videos: check server logs for FFmpeg or Walrus errors.
+- Paid videos: you must call `create_video` on-chain; otherwise the watcher has nothing to link.
+
+**Wallet signature rejected**
+
+- Ensure the timestamp is within ±60 seconds of the server clock.
+- Ensure the signing address matches the video's `creator`.
+
+**Walrus blob not loading**
+
+- Walrus storage is epoch-based. Expired blobs cannot be streamed. Renewals are not yet implemented.
+
+**ID resolution**
+
+>>>>>>> 8b0d4ce (chore: remove reindex endpoint and legacy stream path)
 - All endpoints that accept `{id}` resolve by `paylock_id` first, then by `sui_object_id`. Prefer `sui_object_id` for stable links.

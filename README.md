@@ -24,6 +24,26 @@ PayLock is a Go backend for decentralized video hosting. It stores video assets 
 
 > When FFmpeg is disabled, the server skips preview extraction and uses the full file as the preview blob.
 
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as PayLock Server
+    participant W as Walrus
+
+    C->>S: POST /api/upload (video file)
+    S->>S: Validate magic bytes & size
+    S-->>C: 202 { id, status: "processing" }
+    alt FFmpeg enabled
+        S->>S: Extract preview clip + thumbnail
+    end
+    S->>W: Store preview blob
+    S->>W: Store full blob
+    S->>W: Store thumbnail (if generated)
+    S-->>S: Status → ready
+    C->>S: GET /stream/{id}/preview
+    S-->>C: 307 → Walrus aggregator URL
+```
+
 ### Paid Videos (price > 0)
 
 1. Client uploads the full video to `POST /api/upload` with `price > 0`. **FFmpeg is required.**
@@ -33,11 +53,54 @@ PayLock is a Go backend for decentralized video hosting. It stores video assets 
 5. The chain watcher detects the `VideoCreated` event and links the on-chain object to the local record.
 6. Status transitions to `ready`. Playback via `GET /stream/{sui_object_id}/preview` or `/full`.
 
+<<<<<<< HEAD
+=======
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as PayLock Server
+    participant W as Walrus
+    participant Sui as Sui Chain
+
+    C->>S: POST /api/upload (video, price > 0)
+    S->>S: Validate + FFmpeg extract preview & thumbnail
+    S->>W: Store preview blob
+    S->>W: Store thumbnail
+    S-->>C: 202 { id, status: "processing", preview_blob_id }
+    C->>C: Seal encrypt full video
+    C->>W: Upload encrypted full blob
+    C->>Sui: gating::create_video (blob IDs, namespace)
+    Sui-->>S: VideoCreated event (chain watcher)
+    S->>S: Link on-chain object → local record
+    S-->>S: Status → ready
+```
+
+>>>>>>> 8b0d4ce (chore: remove reindex endpoint and legacy stream path)
 ### Purchase Flow
 
 1. Buyer calls `purchase_and_transfer` on-chain → mints an `AccessPass`.
 2. Buyer creates a Seal `SessionKey`, builds a `seal_approve` Move call, and passes it to `sealClient.decrypt()` to obtain decryption keys.
 3. Client decrypts the encrypted full blob in the browser and plays it.
+<<<<<<< HEAD
+=======
+
+```mermaid
+sequenceDiagram
+    participant B as Buyer
+    participant Sui as Sui Chain
+    participant Seal as Seal Service
+    participant W as Walrus
+
+    B->>Sui: purchase_and_transfer (pay SUI)
+    Sui-->>B: AccessPass minted
+    B->>B: Create Seal SessionKey
+    B->>Sui: seal_approve (AccessPass)
+    B->>Seal: sealClient.decrypt(encrypted blob)
+    Seal-->>B: Decryption keys
+    B->>W: Fetch encrypted full blob
+    B->>B: Decrypt & play video
+```
+>>>>>>> 8b0d4ce (chore: remove reindex endpoint and legacy stream path)
 
 ### Streaming & IDs
 
