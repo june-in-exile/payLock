@@ -48,7 +48,7 @@ sequenceDiagram
 
 1. Client uploads the full video to `POST /api/upload` with `price > 0`. **FFmpeg is required.**
 2. Server extracts a preview clip and thumbnail, uploads them to Walrus, and sets status to `processing` with `preview_blob_id` available.
-3. Client encrypts the full video with [Seal](https://github.com/AgiMaulworworthy/seal) (`@mysten/seal`) and uploads the encrypted blob to Walrus.
+3. Client encrypts the full video with [Seal](https://github.com/MystenLabs/seal) (`@mysten/seal`) and uploads the encrypted blob to Walrus.
 4. Client calls `gating::create_video` on-chain with all blob IDs and the Seal namespace.
 5. The chain watcher detects the `VideoCreated` event and links the on-chain object to the local record.
 6. Status transitions to `ready`. Playback via `GET /stream/{sui_object_id}/preview` or `/full`.
@@ -58,6 +58,7 @@ sequenceDiagram
     participant C as Client
     participant S as PayLock Server
     participant W as Walrus
+    participant Seal as Seal Service
     participant Sui as Sui Chain
 
     C->>S: POST /api/upload (video, price > 0)
@@ -65,7 +66,8 @@ sequenceDiagram
     S->>W: Store preview blob
     S->>W: Store thumbnail
     S-->>C: 202 { id, status: "processing", preview_blob_id }
-    C->>C: Seal encrypt full video
+    C->>Seal: sealClient.encrypt(full video)
+    Seal-->>C: Encrypted full blob
     C->>W: Upload encrypted full blob
     C->>Sui: gating::create_video (blob IDs, namespace)
     Sui-->>S: VideoCreated event (chain watcher)
@@ -90,7 +92,9 @@ sequenceDiagram
     Sui-->>B: AccessPass minted
     B->>B: Create Seal SessionKey
     B->>Sui: seal_approve (AccessPass)
-    B->>Seal: sealClient.decrypt(encrypted blob)
+    B->>Seal: sealClient.decrypt(encrypted blob, session)
+    Seal->>Sui: Verify seal_approve (AccessPass)
+    Sui-->>Seal: Approval confirmed
     Seal-->>B: Decryption keys
     B->>W: Fetch encrypted full blob
     B->>B: Decrypt & play video
