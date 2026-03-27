@@ -3,7 +3,6 @@ import { navigate, formatDate, formatSui, loadWallet } from './state.js';
 import { signForAuth, setAuthHeaders, isWalletConnected } from './wallet.js';
 
 export async function deleteVideo(id, suiObjectId, onDeleted) {
-  if (!confirm('Are you sure you want to delete this video? This action cannot be undone.')) return;
   try {
     // If the video is on-chain, delete it from the chain first.
     if (suiObjectId && isWalletConnected()) {
@@ -17,7 +16,7 @@ export async function deleteVideo(id, suiObjectId, onDeleted) {
       setAuthHeaders(headers, auth);
     }
     const res = await fetch('/api/videos/' + encodeURIComponent(id), { method: 'DELETE', headers });
-    if (!res.ok) {
+    if (!res.ok && res.status !== 404) {
       const data = await res.json().catch(() => ({}));
       alert(data.error || 'Failed to delete video.');
       return;

@@ -21,10 +21,25 @@ let signAndExecuteTransaction = null;
 let gatingPackageId = null;
 let sealClient = null;
 let SealClientClass = null;
+
+async function fetchBlobRobust(url) {
+  for (let i = 0; i < 3; i++) {
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return new Uint8Array(await res.arrayBuffer());
+    } catch (e) {
+      if (i === 2) throw new Error('Network error fetching blob: ' + e.message);
+      await new Promise(r => setTimeout(r, 1500));
+    }
+  }
+}
+
 let SessionKeyClass = null;
 let EncryptedObjectClass = null;
 let fromHex = null;
 let toHex = null;
+let toB64 = null;
 let walrusPublisherUrl = '';
 let walrusAggregatorUrl = '';
 let walrusEpochs = 5;
@@ -103,6 +118,7 @@ export async function initWallet() {
     EncryptedObjectClass = sealMod.EncryptedObject;
     fromHex = utilsMod.fromHex;
     toHex = utilsMod.toHex;
+    toB64 = utilsMod.toB64;
     walrusPublisherUrl = configResult.walrus_publisher_url || '';
     walrusAggregatorUrl = configResult.walrus_aggregator_url || '';
 
@@ -485,9 +501,7 @@ export async function decryptVideo(video, knownAccessPassId) {
   });
   sessionKey.setPersonalMessageSignature(signResult.signature);
 
-  const encryptedRes = await fetch(video.full_blob_url);
-  if (!encryptedRes.ok) throw new Error('Failed to fetch encrypted blob (HTTP ' + encryptedRes.status + ')');
-  const encryptedData = new Uint8Array(await encryptedRes.arrayBuffer());
+  const encryptedData = await fetchBlobRobust(video.full_blob_url);
   if (encryptedData.length > 0 && encryptedData[0] === 0x7B) {
     const text = new TextDecoder().decode(encryptedData);
     throw new Error('Walrus returned an error instead of encrypted data: ' + text.slice(0, 200));
@@ -513,7 +527,7 @@ export async function decryptVideo(video, knownAccessPassId) {
   const decryptedBytes = await sealClient.decrypt({
     data: encryptedData,
     sessionKey,
-    txBytes,
+    txBytes: toB64(txBytes),
   });
 
   const blob = new Blob([decryptedBytes], { type: 'video/mp4' });
@@ -541,9 +555,7 @@ export async function decryptVideoAsOwner(video) {
   });
   sessionKey.setPersonalMessageSignature(signResult.signature);
 
-  const encryptedRes = await fetch(video.full_blob_url);
-  if (!encryptedRes.ok) throw new Error('Failed to fetch encrypted blob (HTTP ' + encryptedRes.status + ')');
-  const encryptedData = new Uint8Array(await encryptedRes.arrayBuffer());
+  const encryptedData = await fetchBlobRobust(video.full_blob_url);
   if (encryptedData.length > 0 && encryptedData[0] === 0x7B) {
     const text = new TextDecoder().decode(encryptedData);
     throw new Error('Walrus returned an error instead of encrypted data: ' + text.slice(0, 200));
@@ -565,7 +577,7 @@ export async function decryptVideoAsOwner(video) {
   const decryptedBytes = await sealClient.decrypt({
     data: encryptedData,
     sessionKey,
-    txBytes,
+    txBytes: toB64(txBytes),
   });
 
   const blob = new Blob([decryptedBytes], { type: 'video/mp4' });

@@ -119,7 +119,6 @@ function PaywallOverlay({ video, onPurchase, purchaseText, purchasing, hint, isO
 }
 
 async function deleteVideo(id, suiObjectId) {
-  if (!confirm('Are you sure you want to delete this video? This action cannot be undone.')) return;
   try {
     // If the video is on-chain, delete it from the chain first.
     if (suiObjectId && isWalletConnected()) {
@@ -478,13 +477,13 @@ export function PlayerView() {
         `}
 
         ${!showPaywall && !showLoading && video && video.price > 0
-          && video.sui_object_id && status === 'ready' && !isOwner(video) && !hasAccess && html`
+          && video.sui_object_id && status === 'ready' && html`
           <button
             class="btn early-purchase-btn"
             disabled=${purchasing}
             onclick=${handlePurchase}
           >
-            ${purchasing ? purchaseText : `${formatSui(video.price)} SUI Unlock`}
+            ${purchasing ? purchaseText : (isOwner(video) || hasAccess ? 'Decrypt Full Video' : `${formatSui(video.price)} SUI Unlock`)}
           </button>
         `}
 

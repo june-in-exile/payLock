@@ -188,24 +188,6 @@ For the paid flow and full API reference, see `API.md`.
 
 ---
 
-## Architecture
-
-```
-cmd/paylock/main.go          — entry point, route registration, embedded frontend
-cmd/paylock/web/             — embedded SPA (uploads, playback, wallet integration)
-
-internal/config/             — env-based configuration
-internal/model/              — VideoStore (RWMutex + JSON file persistence + sui_object_id index)
-internal/walrus/             — Walrus HTTP client (Store, BlobURL)
-internal/processor/          — magic-byte validators, size/duration validators, FFmpeg wrappers
-internal/handler/            — HTTP handlers (upload, status, stream, videos, config)
-internal/watcher/            — Sui chain watcher (polls VideoCreated/VideoDeleted events)
-internal/indexer/            — Startup reindexer (full scan of on-chain Video objects)
-internal/middleware/         — CORS middleware (applied to /stream/* only)
-```
-
----
-
 ## License
 
 MIT
