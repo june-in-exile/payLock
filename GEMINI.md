@@ -8,35 +8,38 @@ PayLock is a **video-native decentralized storage infrastructure** for Sui. It i
 
 - **Language**: Go (v1.25+)
 - **Storage**: Walrus (Testnet)
-- **Video Processing**: FFmpeg (optional; required for paid uploads to generate previews)
+- **Video Processing**: FFmpeg (required for previews and thumbnails)
 - **Architecture**:
   - `cmd/paylock`: Server entry point.
-  - `internal/handler`: HTTP handlers (Upload/Status/Videos). Now integrates with Walrus.
+  - `internal/handler`: HTTP handlers (Upload/Status/Videos). Integrates with Walrus.
   - `internal/walrus`: Client for Walrus Publisher and Aggregator.
-  - `internal/model`: In-memory state for video metadata and Walrus Blob IDs.
-  - `internal/config`: Configuration for Walrus endpoints and local settings.
+  - `internal/model`: In-memory state with disk persistence for video metadata and Walrus Blob IDs.
+  - `internal/watcher`: Polls Sui for `VideoCreated` events to link local records.
+  - `internal/indexer`: On-startup reindexing from chain.
 
-## Core Workflows (Current v2 Transition)
+## Core Workflows
 
-1. **Upload**: 
-   - Receives MP4 via `POST /api/upload`.
-   - Validates magic bytes (MP4) and file size.
-   - **New**: Uploads the raw video blob directly to Walrus asynchronously.
-2. **Streaming**: 
-   - `GET /stream/{id}` is currently a proxy/redirect layer pointing to the Walrus Aggregator.
-3. **Status**: 
-   - Monitors the upload progress to Walrus and returns the `blobId` and `blobUrl`.
+1. **Upload (`POST /api/upload`)**: 
+   - Receives video via multipart form.
+   - **Free Videos**: Server extracts a preview (if needed), optimizes for fast-start, and uploads both preview and full video to Walrus.
+   - **Paid Videos**: Server extracts a preview and thumbnail, uploads them to Walrus, and waits for the client to encrypt and upload the full video on-chain.
+2. **Status (`GET /api/status/{id}`)**: 
+   - SSE endpoint providing real-time updates on processing and Walrus upload progress.
+3. **Chain Sync**:
+   - Background watcher monitors Sui events to link on-chain video objects to local metadata once the client completes the `create_video` transaction.
 
 ## Development Conventions
 
-- **Walrus First**: All video data should eventually reside on Walrus.
-- **Asynchronous Operations**: Heavy I/O (like Walrus uploads) happens in background goroutines.
-- **Minimal Middleware**: Moving away from being a "heavy" proxy towards being a metadata/access coordinator.
+- **Walrus First**: All video data resides on Walrus.
+- **Asynchronous Operations**: Heavy I/O and processing (FFmpeg, Walrus uploads) happen in background goroutines.
+- **Metadata Coordinator**: The backend acts as a coordinator between the client, Walrus, and Sui, rather than a heavy streaming proxy.
 
 ## Environment Variables
 
 - `PAYLOCK_WALRUS_PUBLISHER_URL`: Walrus publisher endpoint.
 - `PAYLOCK_WALRUS_AGGREGATOR_URL`: Walrus aggregator endpoint.
-- `PAYLOCK_WALRUS_EPOCHS`: Number of epochs to store blobs on Walrus.
+- `PAYLOCK_WALRUS_EPOCHS`: Number of epochs to store blobs on Walrus (default 5).
 - `PAYLOCK_ENABLE_FFMPEG`: Enable FFmpeg processing for previews and thumbnails (default true).
 - `PAYLOCK_GATING_PACKAGE_ID`: Deployed gating Move package ID on Sui.
+- `PAYLOCK_SUI_RPC_URL`: Sui RPC node URL.
+- `PAYLOCK_DATA_DIR`: Directory for persistent video metadata (default "data").

@@ -9,8 +9,11 @@ PayLock is a **decentralized video storage infrastructure** for Sui. It manages 
 **Current State (v2 Alpha):**
 
 - Video uploads are stored directly on Walrus via the Publisher API.
-- Streaming is handled via HTTP 307 redirects to the Walrus Aggregator.
-- FFmpeg processing is optional. When disabled, paid uploads are rejected to avoid leaking full videos as previews.
+- **Free videos**: stored as single blob, served via 307 redirect to Walrus Aggregator.
+- **Paid videos**: preview/thumbnail extracted via FFmpeg; full blob linked from on-chain Sui transaction.
+- **Sui wallet authentication**: Ed25519 signature verification via `suiauth` package.
+- **Chain sync**: background watcher polls for `VideoCreated`/`VideoDeleted` events; startup indexer rehydrates state from chain.
+- **FFmpeg is required** (`PAYLOCK_ENABLE_FFMPEG=true` default).
 
 ## Build Commands
 
@@ -35,13 +38,13 @@ go test ./internal/walrus/... -run TestStore -v
 ## Prerequisites
 
 - Go 1.25+
-- (Optional) `ffmpeg` and `ffprobe` when enabling server-side preview/thumbnail processing
+- `ffmpeg` and `ffprobe` (required for server-side preview/thumbnail processing)
 
 ## Code Style Guidelines
 
 ### General
 
-- No external dependencies beyond Go standard library (except essential ecosystem tools like `godotenv`)
+- No external dependencies beyond Go standard library (except `godotenv` and `golang.org/x/crypto`)
 - Use `log/slog` for structured logging (not `log`)
 - Prefer early returns to reduce nesting
 - Keep functions focused and small
@@ -105,17 +108,28 @@ import (
 | `PAYLOCK_WALRUS_AGGREGATOR_URL` | `https://aggregator.walrus-testnet.walrus.space` | Walrus Aggregator API |
 | `PAYLOCK_WALRUS_EPOCHS` | `5` | Default storage duration in epochs |
 | `PAYLOCK_MAX_FILE_SIZE_MB` | `500` | Upload size limit in MB |
+| `PAYLOCK_MAX_PREVIEW_SIZE_MB` | `50` | Preview file size limit in MB |
+| `PAYLOCK_MAX_PREVIEW_DURATION` | `300` | Max preview duration in seconds |
 | `PAYLOCK_ENABLE_FFMPEG` | `true` | Enable FFmpeg processing for preview/thumbnail |
+| `PAYLOCK_FFMPEG_PATH` | `ffmpeg` | Path to ffmpeg binary |
+| `PAYLOCK_FFPROBE_PATH` | `ffprobe` | Path to ffprobe binary |
+| `PAYLOCK_SUI_RPC_URL` | `https://fullnode.testnet.sui.io:443` | Sui Fullnode RPC URL |
 | `PAYLOCK_GATING_PACKAGE_ID` | `0xec50faf6c1bb5720d7744476282a7b22600254de3ed849808ff9aacef8ba161a` | Deployed gating Move package ID on Sui |
+| `PAYLOCK_DATA_DIR` | `data` | Directory for persisting video store |
+| `PAYLOCK_WATCHER_INTERVAL` | `5` | Chain watcher polling interval in seconds |
 
 ## Directory Structure
 
 ```
-cmd/paylock/main.go          — Entry point; wires all handlers and clients
+cmd/paylock/              — Entry point; wires all handlers and clients
+cmd/paylock/web/          — Embedded static web files
 internal/config/          — Environment loading and validation
-internal/model/           — Data models (Video, VideoStore)
+internal/model/            — Data models (Video, VideoStore)
 internal/walrus/          — Walrus Publisher/Aggregator client
-internal/handler/         — HTTP handlers (upload, status, stream redirect)
-internal/middleware/      — APIKey auth + CORS middleware
-internal/processor/       — (Legacy/Future) FFmpeg wrappers
+internal/handler/         — HTTP handlers (upload, video, status, delete, auth)
+internal/suiauth/         — Sui wallet Ed25519 signature verification
+internal/watcher/         — Chain event watcher (VideoCreated/VideoDeleted)
+internal/indexer/         — Startup chain indexer (rehydration from Sui)
+internal/processor/       — FFmpeg wrappers (preview/thumbnail extraction)
+internal/testutil/        — Test utilities and fixtures
 ```
