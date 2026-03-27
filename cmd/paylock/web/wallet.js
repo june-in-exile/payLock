@@ -540,7 +540,7 @@ export async function decryptVideo(video, knownAccessPassId) {
   const decryptedBytes = await sealClient.decrypt({
     data: encryptedData,
     sessionKey,
-    txBytes: toB64(txBytes),
+    txBytes,
   });
 
   const blob = new Blob([decryptedBytes], { type: 'video/mp4' });
@@ -564,6 +564,7 @@ export async function decryptVideoAsOwner(video) {
 
   const parsedEncrypted = EncryptedObjectClass.parse(encryptedData);
   const sealId = parsedEncrypted.id;
+
   const tx = new Transaction();
   tx.moveCall({
     target: gatingPackageId + '::gating::seal_approve_owner',
@@ -577,7 +578,7 @@ export async function decryptVideoAsOwner(video) {
   const decryptedBytes = await sealClient.decrypt({
     data: encryptedData,
     sessionKey,
-    txBytes: toB64(txBytes),
+    txBytes,
   });
 
   const blob = new Blob([decryptedBytes], { type: 'video/mp4' });

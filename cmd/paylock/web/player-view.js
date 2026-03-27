@@ -474,13 +474,13 @@ export function PlayerView() {
         `}
 
         ${!showPaywall && !showLoading && video && video.price > 0
-          && video.sui_object_id && status === 'ready' && html`
+          && video.sui_object_id && status === 'ready' && !isOwner(video) && !hasAccess && html`
           <button
             class="btn early-purchase-btn"
             disabled=${purchasing}
             onclick=${handlePurchase}
           >
-            ${purchasing ? purchaseText : (isOwner(video) || hasAccess ? 'Decrypt Full Video' : `${formatSui(video.price)} SUI Unlock`)}
+            ${purchasing ? purchaseText : `${formatSui(video.price)} SUI Unlock`}
           </button>
         `}
 
