@@ -1,54 +1,48 @@
 # PayLock API Reference
 
-This document describes the PayLock backend API for Walrus-backed video storage and Sui paywall integration.
-
 ## Base URL
 
-- Self-hosted: `http://localhost:8080` (default)
-- Deployed: use your own host/port
-
-All endpoint paths are relative to the Base URL, for example `POST /api/upload`.
+Default: `http://localhost:8080`. All paths below are relative to the base URL.
 
 ---
 
-## Flow Overview
+## Authentication
 
-### Free Videos (price = 0)
+Some endpoints accept or require Sui wallet signatures via request headers.
 
-```
-POST /api/upload (price=0)
-  -> Server extracts preview/thumbnail (if FFmpeg enabled)
-  -> Upload preview/full to Walrus
-  -> status=ready
-  -> GET /stream/{id}/preview (307 redirect)
-```
+| Header | Description |
+|--------|-------------|
+| `X-Wallet-Address` | Signer's Sui address (`0x`-prefixed) |
+| `X-Wallet-Sig` | Base64-encoded Sui Ed25519 serialized signature (97 bytes) |
+| `X-Wallet-Timestamp` | Unix timestamp (seconds); server allows ±60 s drift |
 
-### Paid Videos (price > 0)
+The signed message format:
 
 ```
-POST /api/upload (price>0)
-  -> Server extracts preview/thumbnail (FFmpeg required) and uploads preview
-  -> status=processing
-  -> Client encrypts full video (Seal), uploads to Walrus
-  -> Client calls gating::create_video on-chain
-  -> Watcher detects VideoCreated and links sui_object_id
-  -> status=ready
-  -> GET /stream/{sui_object_id}/preview or /full (307 redirect)
+paylock:<action>:<resourceId>:<timestamp>
 ```
+
+- `action`: `upload` or `delete`
+- `resourceId`: empty for upload, the video `{id}` for delete
+
+| Endpoint | Auth |
+|----------|------|
+| `POST /api/upload` | Optional — if valid, `creator` is recorded |
+| `DELETE /api/videos/{id}` | Required only when the video has both `creator` and `sui_object_id` |
 
 ---
 
-## Common Formats
+## Common Types
 
 ### Video Status
 
-| Value | Description |
-|-------|-------------|
-| `processing` | Upload received and background processing pending or on-chain linking pending |
-| `ready` | Preview/full blobs available and linked |
-| `failed` | Processing failed; see `error` |
+| Value | Meaning |
+|-------|---------|
+| `processing` | Background upload or on-chain linking in progress |
+| `ready` | All blobs available |
+| `failed` | Processing error; see `error` field |
 
-### Video Object Fields
+### Video Object
 
 ```json
 {
@@ -72,114 +66,67 @@ POST /api/upload (price>0)
 }
 ```
 
-Notes:
-
 - `encrypted` is `true` when `price > 0`.
-- Paid uploads may show `preview_blob_id` while still `status=processing`; `full_blob_id` arrives after on-chain linking.
+- Paid videos may have `preview_blob_id` while still `processing`; `full_blob_id` is set after the chain watcher links the on-chain object.
 - Fields with `omitempty` are omitted when empty.
 
-### Error Response Format
+### Error Response
 
 ```json
-{ "error": "description message" }
+{ "error": "description" }
 ```
-
----
-
-## Authentication
-
-PayLock uses Sui wallet signatures for creator operations. The signature is optional on upload and required for delete when the video has an on-chain object.
-
-### Wallet Signature Headers
-
-| Header | Description |
-|--------|-------------|
-| `X-Wallet-Address` | Signer's Sui address (`0x`-prefixed) |
-| `X-Wallet-Sig` | Base64-encoded Sui Ed25519 serialized signature (97 bytes) |
-| `X-Wallet-Timestamp` | Unix timestamp (seconds); server allows ±60s drift |
-
-### Signature Message
-
-```
-paylock:<action>:<resourceId>:<timestamp>
-```
-
-- `action` is `upload` or `delete`.
-- `resourceId` is empty for upload and the `{id}` for delete.
-
-### Auth Rules
-
-- `POST /api/upload`: signature is optional. If valid, the server stores `creator` for the new video.
-- `DELETE /api/videos/{id}`: signature required only when the video has both `creator` and `sui_object_id` set.
 
 ---
 
 ## CORS
 
-Only `/stream/*` endpoints have CORS enabled. `/api/*` does not set CORS headers; use a proxy or reverse proxy if needed.
+Only `/stream/*` endpoints return CORS headers (allows `GET`, exposes `Content-Range` and `Content-Length`). `/api/*` does not — use a reverse proxy if cross-origin access is needed.
 
 ---
 
-## API Endpoints
+## Endpoints
 
-### 1. Upload Video
+### `POST /api/upload`
 
-**`POST /api/upload`**
+Start an async video upload. The server validates the file and begins background processing.
 
-Initiate an async upload. The server validates the file and starts background processing.
-
-- **Content-Type**: `multipart/form-data`
-- **Supported formats**: MP4, MOV, WebM, MKV, AVI (validated by magic bytes)
-
-**Parameters**
+**Content-Type**: `multipart/form-data`
+**Supported formats**: MP4, MOV, WebM, MKV, AVI (validated by magic bytes, not extension)
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `video` | Yes | Video file (max `PAYLOCK_MAX_FILE_SIZE_MB`, default 500 MB) |
-| `title` | No | Video title (defaults to generated ID) |
-| `price` | No | Price in MIST (uint64). Omit or `0` for free videos |
-| `preview_duration` | No | Preview length in seconds. Defaults to `preview_duration_default` from `/api/config` and must be between min/max |
+| `title` | No | Title (defaults to generated ID) |
+| `price` | No | Price in MIST (uint64). Omit or `0` for free |
+| `preview_duration` | No | Preview clip length in seconds (default 10, min 10, max 300) |
 
-**Success Response** (`202 Accepted`)
+**`202 Accepted`**
 
 ```json
-{
-  "id": "a1b2c3d4e5f6g7h8",
-  "status": "processing"
-}
+{ "id": "a1b2c3d4e5f6g7h8", "status": "processing" }
 ```
 
-**Error Responses**
-
-| Status | Reason |
-|--------|--------|
-| `400` | Invalid price, preview duration, or file format |
+| Error | Reason |
+|-------|--------|
+| `400` | Invalid price, duration, or file format. Paid upload with FFmpeg disabled. |
 | `413` | File exceeds size limit |
 
 ---
 
-### 2. Get Video Status
+### `GET /api/status/{id}`
 
-**`GET /api/status/{id}`**
+Returns the full Video object. `{id}` can be `paylock_id` or `sui_object_id` (resolved in that order).
 
-Returns the full Video object. `{id}` can be either `paylock_id` or `sui_object_id`. The server resolves by `paylock_id` first, then falls back to `sui_object_id`.
-
-**Error Responses**
-
-| Status | Reason |
-|--------|--------|
-| `400` | Missing video id |
-| `404` | Video not found |
+| Error | Reason |
+|-------|--------|
+| `400` | Missing id |
+| `404` | Not found |
 
 ---
 
-### 3. Real-Time Status Tracking (SSE)
+### `GET /api/status/{id}/events`
 
-**`GET /api/status/{id}/events`**
-
-SSE stream that immediately sends the current Video object and then sends the next update (ready/failed or preview-upload update for paid videos). If the connection closes while the video is still `processing`, reconnect or poll.
-
-Example SSE events:
+SSE stream. Immediately sends the current Video object, then pushes updates on state changes (preview uploaded, ready, failed). Reconnect if the connection drops while `processing`.
 
 ```
 data: {"id":"...","status":"processing","title":"My Video"}
@@ -189,25 +136,19 @@ data: {"id":"...","status":"ready","preview_blob_id":"...","full_blob_id":"..."}
 
 ---
 
-### 4. List Videos
+### `GET /api/videos`
 
-**`GET /api/videos`**
-
-Returns videos sorted by `created_at` descending.
-
-**Query Parameters**
+List videos, sorted by `created_at` descending.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `creator` | (none) | Filter by creator address |
+| `creator` | *(none)* | Filter by creator address |
 | `page` | `1` | Page number (1-based) |
 | `per_page` | `20` | Items per page (max 100) |
 
-**Success Response**
-
 ```json
 {
-  "videos": [ { "id": "...", "status": "ready" } ],
+  "videos": [ ... ],
   "total": 42,
   "page": 1,
   "per_page": 20
@@ -216,59 +157,40 @@ Returns videos sorted by `created_at` descending.
 
 ---
 
-### 5. Delete Video
+### `DELETE /api/videos/{id}`
 
-**`DELETE /api/videos/{id}`**
+Delete a video record from the local store. Does **not** delete Walrus blobs or on-chain objects.
 
-Deletes the video record from the backend store. This does not delete Walrus blobs or on-chain objects.
+| Error | Reason |
+|-------|--------|
+| `401` | Missing or invalid wallet signature |
+| `403` | Address does not match creator |
+| `404` | Not found |
 
-**Auth**
-
-- Required only if the video has both `creator` and `sui_object_id` set.
-
-**Success Response**
+**`200 OK`**
 
 ```json
 { "id": "...", "status": "deleted" }
 ```
 
-**Error Responses**
+---
 
-| Status | Reason |
-|--------|--------|
-| `401` | Missing or invalid wallet signature (when required) |
-| `403` | Wallet address does not match creator |
-| `404` | Video not found |
+### `GET /stream/{id}/preview`
+
+307 redirect to the Walrus aggregator URL for the preview blob.
+
+- Accepts both `paylock_id` and `sui_object_id`.
+- If accessed by `paylock_id` that has a linked `sui_object_id`, redirects to the canonical path with `Deprecation` and `Sunset: 2026-06-23` headers.
+
+### `GET /stream/{id}/full`
+
+307 redirect to the full blob URL. For paid videos this is the encrypted blob — the client decrypts it with Seal.
 
 ---
 
-### 6. Preview Stream
+### `GET /api/config`
 
-**`GET /stream/{id}/preview`**
-
-307 Redirect to the preview blob URL. Available to anyone.
-
-Notes:
-
-- If a `paylock_id` has a linked `sui_object_id`, the server redirects to `/stream/{sui_object_id}/preview`.
-- When accessed by `paylock_id`, the server sets deprecation headers with a `Sunset` date of `2026-06-23`.
-- `GET /stream/{id}` is deprecated and redirects to `/stream/{id}/preview` with a `Sunset` date of `2026-09-23`.
-
----
-
-### 7. Full Stream
-
-**`GET /stream/{id}/full`**
-
-307 Redirect to the full blob URL. For paid videos this is typically an encrypted blob that the client decrypts with Seal.
-
----
-
-### 8. System Config
-
-**`GET /api/config`**
-
-Returns configuration for clients.
+Client configuration.
 
 ```json
 {
@@ -286,56 +208,37 @@ Returns configuration for clients.
 
 ---
 
-### 9. Manual Reindex
+## Paid Video Integration
 
-**`POST /api/reindex`**
-
-Triggers a full chain reindex. Requires `Authorization: Bearer <PAYLOCK_ADMIN_SECRET>`.
-
-**Success Response**
-
-```json
-{
-  "status": "ok",
-  "chain_total": 120,
-  "new_entries": 3,
-  "pruned": 2
-}
-```
-
----
-
-## Paid Video Integration Guide
-
-This section outlines the paid flow at a high level. Client-side Seal usage and on-chain calls are required for paid videos.
-
-### 1. Upload and Wait for Preview
+### 1. Upload and wait for preview
 
 ```js
 const form = new FormData();
 form.append('video', file);
 form.append('title', 'My Paid Video');
 form.append('price', '1000000000');
-const res = await fetch(`${PAYLOCK}/api/upload`, { method: 'POST', body: form });
-const { id: paylockId } = await res.json();
 
-const es = new EventSource(`${PAYLOCK}/api/status/${paylockId}/events`);
-es.onmessage = (e) => {
-  const v = JSON.parse(e.data);
-  if (v.preview_blob_id) {
-    es.close();
-    // proceed to encrypt/upload full and call create_video
-  }
-};
+const { id } = await fetch(`${PAYLOCK}/api/upload`, {
+  method: 'POST',
+  body: form,
+}).then(r => r.json());
+
+// Wait for server to extract and upload the preview
+const preview = await new Promise((resolve, reject) => {
+  const es = new EventSource(`${PAYLOCK}/api/status/${id}/events`);
+  es.onmessage = (e) => {
+    const v = JSON.parse(e.data);
+    if (v.preview_blob_id) { es.close(); resolve(v); }
+    if (v.status === 'failed') { es.close(); reject(new Error(v.error)); }
+  };
+});
 ```
 
-### 2. Encrypt Full Video and Upload to Walrus
+### 2. Encrypt full video and upload to Walrus
 
-Use `@mysten/seal` to encrypt, then upload the encrypted bytes to the Walrus Publisher API to obtain `full_blob_id`.
+Use `@mysten/seal` to encrypt the original video, then upload the encrypted bytes directly to the Walrus Publisher API to obtain a `full_blob_id`.
 
-### 3. Create On-Chain Video
-
-Call the Move function with all blob IDs:
+### 3. Create on-chain Video
 
 ```js
 import { Transaction } from '@mysten/sui/transactions';
@@ -354,40 +257,38 @@ tx.moveCall({
 });
 ```
 
-### 4. Wait for Watcher Sync
+### 4. Wait for watcher sync
 
-The watcher polls Sui and links the on-chain object to the local entry. Continue polling or re-opening the SSE stream until `status === 'ready'` and `sui_object_id` is set.
+The chain watcher polls Sui for `VideoCreated` events and links the on-chain object to the local record. Poll `GET /api/status/{id}` or reconnect to the SSE stream until `status === 'ready'` and `sui_object_id` is set.
 
 ---
 
 ## Move Contract Reference (`paylock::gating`)
 
-Key items from `contracts/sources/gating.move`:
+From `contracts/sources/gating.move`:
 
-- `create_video(title, price, thumbnail_blob_id, preview_blob_id, full_blob_id, seal_namespace)`
-- `purchase_and_transfer(video, payment)`
-- `seal_approve(id, pass, video)`
-- `VideoCreated` event
-- `VideoDeleted` event
+| Function / Event | Description |
+|------------------|-------------|
+| `create_video(title, price, thumbnail_blob_id, preview_blob_id, full_blob_id, seal_namespace)` | Register a video on-chain |
+| `purchase_and_transfer(video, payment)` | Pay and mint an `AccessPass` |
+| `seal_approve(id, pass, video)` | Authorize Seal decryption |
+| `VideoCreated` event | Emitted on creation for backend sync |
+| `VideoDeleted` event | Emitted on deletion for backend cleanup |
 
 ---
 
-## FAQ / Troubleshooting
+## Troubleshooting
 
-### ID Resolution Logic
+**Upload stuck on `processing`**
+- Free videos: check server logs for FFmpeg or Walrus errors.
+- Paid videos: you must call `create_video` on-chain; otherwise the watcher has nothing to link.
 
-`/api/status/{id}` and `/stream/{id}/*` resolve by `paylock_id` first, then by `sui_object_id`. If you store both IDs, prefer the `sui_object_id` for canonical links.
+**Wallet signature rejected**
+- Ensure the timestamp is within ±60 seconds of the server clock.
+- Ensure the signing address matches the video's `creator`.
 
-### Upload Stuck on `processing`
+**Walrus blob not loading**
+- Walrus storage is epoch-based. Expired blobs cannot be streamed. Renewals are not yet implemented.
 
-- Free videos: check FFmpeg availability if you expect previews/thumbnails.
-- Paid videos: you must call `create_video` on-chain; otherwise the watcher will never link and the status stays `processing`.
-
-### Wallet Signature Errors
-
-- If delete is unauthorized, ensure the timestamp is within ±60 seconds and the signature matches the `creator` address.
-
-### Walrus Blob Expiry
-
-Walrus storage is epoch-based. Once a blob expires it cannot be streamed. Renewals are not implemented yet.
-
+**ID resolution**
+- All endpoints that accept `{id}` resolve by `paylock_id` first, then by `sui_object_id`. Prefer `sui_object_id` for stable links.

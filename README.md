@@ -1,62 +1,100 @@
-# PayLock — Decentralized Video Storage & Paywall for Sui
+# PayLock — Decentralized Video Storage & Paywall on Sui
 
-## Introduction
-
-PayLock is a backend service for decentralized video storage on Sui. It uploads video assets to **Walrus** via the Publisher API, serves playback via **HTTP 307 redirects** to the Walrus Aggregator, and syncs metadata with the **Sui gating contract**. It includes optional FFmpeg-based preview and thumbnail generation plus a simple REST API and embedded web UI.
-
-## Current State (v2 Alpha)
-
-- Video uploads are stored directly on Walrus via the Publisher API.
-- Streaming is handled via HTTP 307 redirects to the Walrus Aggregator.
-- FFmpeg processing is optional. When disabled, paid uploads are rejected to avoid leaking full videos as previews.
+PayLock is a Go backend for decentralized video hosting. It stores video assets on [Walrus](https://walrus.xyz), serves playback via HTTP redirects to the Walrus Aggregator, and integrates with a Sui Move contract for on-chain paywalls. Includes optional FFmpeg-based preview/thumbnail generation, a chain watcher for automatic sync, and an embedded web UI.
 
 ## Features
 
-- Walrus Publisher integration for blob storage
-- Walrus Aggregator redirects for playback (`/stream/*`)
-- Optional FFmpeg preview + thumbnail extraction and faststart optimization
-- Server-Sent Events (SSE) for status updates
-- Sui chain watcher and reindexer to sync on-chain video objects
-- Embedded frontend UI for uploads and playback
+- Upload and store videos on Walrus (MP4, MOV, WebM, MKV, AVI)
+- Free and paid video flows with on-chain paywall via Sui Move contract
+- FFmpeg preview extraction, thumbnail generation, and faststart optimization
+- Real-time upload status via Server-Sent Events (SSE)
+- Sui chain watcher that auto-syncs on-chain `Video` objects
+- Embedded single-page frontend for uploads and playback
+- Wallet signature authentication for creator operations
 
 ---
 
-## Architecture
+## How It Works
 
-### Free Video Flow (price = 0)
+### Free Videos (price = 0)
 
-1. Client uploads video to `POST /api/upload` with `price=0` or omitted.
-2. Server optionally extracts preview/thumbnail with FFmpeg and uploads assets to Walrus.
-3. Server marks the video `ready` and returns `preview_blob_id` and `full_blob_id`.
-4. Playback via `GET /stream/{id}/preview` or `GET /stream/{id}/full` (307 redirect).
+1. Client uploads a video to `POST /api/upload`.
+2. Server validates the file, optionally extracts a preview clip and thumbnail (FFmpeg), and uploads all blobs to Walrus.
+3. Status transitions to `ready`. Playback via `GET /stream/{id}/preview` or `/full` (307 redirect to Walrus).
 
-### Paid Video Flow (price > 0)
+> When FFmpeg is disabled, the server skips preview extraction and uses the full file as the preview blob.
 
-1. Client uploads full video to `POST /api/upload` with `price>0`.
-2. Server extracts preview/thumbnail (FFmpeg required) and uploads preview to Walrus.
-3. Client encrypts the full video (Seal) and uploads the encrypted blob to Walrus.
-4. Client calls `gating::create_video` on-chain with `title`, `price`, `thumbnail_blob_id`, `preview_blob_id`, `full_blob_id`, and `seal_namespace`.
-5. Watcher detects the `VideoCreated` event and links the on-chain object to the local record.
-6. Server marks the video `ready`; playback via `/stream/{sui_object_id}/preview` or `/stream/{sui_object_id}/full`.
+### Paid Videos (price > 0)
+
+1. Client uploads the full video to `POST /api/upload` with `price > 0`. **FFmpeg is required.**
+2. Server extracts a preview clip and thumbnail, uploads them to Walrus, and sets status to `processing` with `preview_blob_id` available.
+3. Client encrypts the full video with [Seal](https://github.com/AgiMaulworworthy/seal) (`@mysten/seal`) and uploads the encrypted blob to Walrus.
+4. Client calls `gating::create_video` on-chain with all blob IDs and the Seal namespace.
+5. The chain watcher detects the `VideoCreated` event and links the on-chain object to the local record.
+6. Status transitions to `ready`. Playback via `GET /stream/{sui_object_id}/preview` or `/full`.
+
+### Purchase Flow
+
+1. Buyer calls `purchase_and_transfer` on-chain → mints an `AccessPass`.
+2. Buyer creates a Seal `SessionKey`, builds a `seal_approve` Move call, and passes it to `sealClient.decrypt()` to obtain decryption keys.
+3. Client decrypts the encrypted full blob in the browser and plays it.
 
 ### Streaming & IDs
 
 - `/stream/{id}/preview` and `/stream/{id}/full` accept both `paylock_id` and `sui_object_id`.
-- If a `paylock_id` has an associated on-chain object, the server redirects to the canonical `sui_object_id` path and returns deprecation headers.
-- `GET /stream/{id}` is deprecated and redirects to `/stream/{id}/preview`.
+- If a `paylock_id` has a linked on-chain object, the server redirects to the canonical `sui_object_id` URL with deprecation headers.
 
 ---
 
 ## On-Chain Contract
 
-Contract source: `contracts/sources/gating.move`.
+Source: `contracts/sources/gating.move`
 
-Key types and events:
+| Item | Description |
+|------|-------------|
+| `Video` (shared object) | title, price, creator, blob IDs, seal namespace |
+| `AccessPass` (owned object) | Proof of purchase for Seal decryption |
+| `create_video` | Register a video on-chain |
+| `delete_video` | Creator deletes their video |
+| `purchase_and_transfer` | Pay and mint an AccessPass |
+| `seal_approve` | Authorize Seal decryption (with AccessPass) |
+| `seal_approve_owner` | Creator decrypts without AccessPass |
+| `VideoCreated` / `VideoDeleted` events | Emitted for backend sync |
 
-- `Video` (shared object): title, price, creator, thumbnail/preview/full blob IDs, seal namespace
-- `VideoCreated` event: emitted by `create_video` for backend sync
-- `VideoDeleted` event: emitted by `delete_video` for backend cleanup
-- `AccessPass` (owned object): proof of purchase for Seal decryption
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Go 1.25+
+- FFmpeg + FFprobe (required for paid uploads; optional for free uploads)
+
+### Run
+
+```bash
+cp .env.example .env   # edit as needed
+make run               # go run ./cmd/paylock
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PAYLOCK_PORT` | `8080` | HTTP listen port |
+| `PAYLOCK_DATA_DIR` | `data` | Metadata storage directory |
+| `PAYLOCK_WALRUS_PUBLISHER_URL` | `https://publisher.walrus-testnet.walrus.space` | Walrus Publisher API |
+| `PAYLOCK_WALRUS_AGGREGATOR_URL` | `https://aggregator.walrus-testnet.walrus.space` | Walrus Aggregator API |
+| `PAYLOCK_WALRUS_EPOCHS` | `5` | Walrus storage duration (epochs) |
+| `PAYLOCK_MAX_FILE_SIZE_MB` | `500` | Upload size limit (MB) |
+| `PAYLOCK_MAX_PREVIEW_SIZE_MB` | `50` | Preview size limit (MB) |
+| `PAYLOCK_MAX_PREVIEW_DURATION` | `300` | Max preview duration (seconds) |
+| `PAYLOCK_ENABLE_FFMPEG` | `true` | Enable FFmpeg processing |
+| `PAYLOCK_FFMPEG_PATH` | `ffmpeg` | FFmpeg binary path |
+| `PAYLOCK_FFPROBE_PATH` | `ffprobe` | FFprobe binary path |
+| `PAYLOCK_SUI_RPC_URL` | `https://fullnode.testnet.sui.io:443` | Sui RPC endpoint |
+| `PAYLOCK_GATING_PACKAGE_ID` | *(none)* | Deployed gating Move package ID |
+| `PAYLOCK_WATCHER_INTERVAL` | `5` | Chain watcher poll interval (seconds) |
 
 ---
 
@@ -81,56 +119,29 @@ await new Promise((resolve, reject) => {
   es.onerror = () => { es.close(); reject(new Error('SSE error')); };
 });
 
-// 3. Play — browser auto-follows 307 redirect to Walrus
+// 3. Play — browser follows 307 redirect to Walrus
 videoElement.src = `${PAYLOCK}/stream/${id}/preview`;
 ```
 
-For paid flow details, see `API.md`.
+For the paid flow and full API reference, see `API.md`.
 
 ---
 
-## Self-Hosting
+## Architecture
 
-### Prerequisites
-
-- Go 1.25+
-- FFmpeg + FFprobe (required for paid uploads; recommended for previews/faststart)
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PAYLOCK_PORT` | `8080` | HTTP listen port |
-| `PAYLOCK_DATA_DIR` | `data` | Metadata and local cache storage |
-| `PAYLOCK_WALRUS_PUBLISHER_URL` | `https://publisher.walrus-testnet.walrus.space` | Walrus Publisher API |
-| `PAYLOCK_WALRUS_AGGREGATOR_URL` | `https://aggregator.walrus-testnet.walrus.space` | Walrus Aggregator API |
-| `PAYLOCK_WALRUS_EPOCHS` | `5` | Walrus storage duration in epochs |
-| `PAYLOCK_MAX_FILE_SIZE_MB` | `500` | Upload size limit in MB |
-| `PAYLOCK_MAX_PREVIEW_SIZE_MB` | `50` | Max preview size (MB) |
-| `PAYLOCK_MAX_PREVIEW_DURATION` | `300` | Max preview duration (seconds) |
-| `PAYLOCK_ENABLE_FFMPEG` | `true` | Enable FFmpeg processing |
-| `PAYLOCK_FFMPEG_PATH` | `ffmpeg` | FFmpeg binary path |
-| `PAYLOCK_FFPROBE_PATH` | `ffprobe` | FFprobe binary path |
-| `PAYLOCK_SUI_RPC_URL` | `https://fullnode.testnet.sui.io:443` | Sui RPC endpoint |
-| `PAYLOCK_GATING_PACKAGE_ID` | `0xec50...161a` | Deployed gating package ID |
-| `PAYLOCK_ADMIN_SECRET` | (empty) | Bearer token for `/api/reindex` |
-| `PAYLOCK_WATCHER_INTERVAL` | `5` | Chain watcher poll interval (seconds) |
-
-### Start the Server
-
-```bash
-# 1. Copy and edit the environment variables
-cp .env.example .env
-
-# 2. Start the server
-make run
 ```
+cmd/paylock/main.go          — entry point, route registration, embedded frontend
+cmd/paylock/web/             — embedded SPA (uploads, playback, wallet integration)
 
----
-
-## API Reference
-
-See `API.md` for full API specs and the paid video integration guide.
+internal/config/             — env-based configuration
+internal/model/              — VideoStore (RWMutex + JSON file persistence + sui_object_id index)
+internal/walrus/             — Walrus HTTP client (Store, BlobURL)
+internal/processor/          — magic-byte validators, size/duration validators, FFmpeg wrappers
+internal/handler/            — HTTP handlers (upload, status, stream, videos, config)
+internal/watcher/            — Sui chain watcher (polls VideoCreated/VideoDeleted events)
+internal/indexer/            — Startup reindexer (full scan of on-chain Video objects)
+internal/middleware/         — CORS middleware (applied to /stream/* only)
+```
 
 ---
 

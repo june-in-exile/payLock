@@ -102,40 +102,6 @@ func (h *StreamFull) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, video.FullBlobURL, http.StatusTemporaryRedirect)
 }
 
-// StreamLegacy handles the deprecated GET /stream/{id} path.
-// It redirects to /stream/{id}/preview with deprecation headers.
-type StreamLegacy struct {
-	videos *model.VideoStore
-}
-
-func NewStreamLegacy(videos *model.VideoStore) *StreamLegacy {
-	return &StreamLegacy{videos: videos}
-}
-
-func (h *StreamLegacy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if id == "" {
-		http.Error(w, "missing video id", http.StatusBadRequest)
-		return
-	}
-
-	// Resolve to canonical sui_object_id if possible.
-	video, canonical, ok := h.videos.Resolve(id)
-	if !ok {
-		http.Error(w, "video not found", http.StatusNotFound)
-		return
-	}
-
-	target := id
-	if !canonical && video.SuiObjectID != "" {
-		target = video.SuiObjectID
-	}
-
-	w.Header().Set("Deprecation", "true")
-	w.Header().Set("Sunset", "2026-09-23")
-	w.Header().Set("Link", `</stream/`+target+`/preview>; rel="successor-version"`)
-	http.Redirect(w, r, "/stream/"+target+"/preview", http.StatusTemporaryRedirect)
-}
 
 // setDeprecationHeaders adds standard deprecation headers to warn clients
 // that the paylock_id-based path is deprecated in favor of sui_object_id.

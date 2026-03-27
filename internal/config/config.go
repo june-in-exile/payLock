@@ -25,7 +25,6 @@ type Config struct {
 	SuiRPCURL              string
 	GatingPackageID        string
 	DataDir                string
-	AdminSecret            string
 	WatcherInterval        time.Duration
 }
 
@@ -48,7 +47,6 @@ func Load() (*Config, error) {
 		PreviewDurationDefault: 10,
 		SuiRPCURL:              envOrDefault("PAYLOCK_SUI_RPC_URL", "https://fullnode.testnet.sui.io:443"),
 		GatingPackageID:        envOrDefault("PAYLOCK_GATING_PACKAGE_ID", "0xec50faf6c1bb5720d7744476282a7b22600254de3ed849808ff9aacef8ba161a"),
-		AdminSecret:            os.Getenv("PAYLOCK_ADMIN_SECRET"),
 		WatcherInterval:        5 * time.Second,
 	}
 

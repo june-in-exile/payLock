@@ -96,13 +96,12 @@ func main() {
 	mux.Handle("GET /api/videos", handler.NewVideos(videos))
 	mux.Handle("DELETE /api/videos/{id}", handler.NewDelete(videos, sigVerifier, clock))
 	mux.Handle("GET /api/config", handler.NewAppConfig(cfg))
-	mux.Handle("POST /api/reindex", handler.NewReindex(idx, videos, wc.BlobURL, cfg.AdminSecret))
 
 	// Stream routes — redirect to Walrus aggregator (supports both paylock_id and sui_object_id)
 	cors := middleware.CORS()
 	mux.Handle("GET /stream/{id}/preview", cors(handler.NewStreamPreview(videos)))
 	mux.Handle("GET /stream/{id}/full", cors(handler.NewStreamFull(videos)))
-	mux.Handle("GET /stream/{id}", cors(handler.NewStreamLegacy(videos))) // deprecated: redirects to /preview
+
 
 	// Frontend (embedded static files)
 	webSub, err := fs.Sub(webFS, "web")
