@@ -1,130 +1,69 @@
-# PayLock — Decentralized Video Paywall SDK for Sui
+# PayLock — Decentralized Video Storage & Paywall for Sui
 
 ## Introduction
 
-PayLock is a video paywall SDK built on Walrus + Seal. When a video is uploaded, it is automatically split into a preview clip and a full version. The preview is publicly playable, while the full version is encrypted with Seal and stored on Walrus. After payment, viewers receive an on-chain access credential to decrypt and watch the full content. Developers can add video paywall functionality to any dApp with just a few lines of code.
+PayLock is a backend service for decentralized video storage on Sui. It uploads video assets to **Walrus** via the Publisher API, serves playback via **HTTP 307 redirects** to the Walrus Aggregator, and syncs metadata with the **Sui gating contract**. It includes optional FFmpeg-based preview and thumbnail generation plus a simple REST API and embedded web UI.
+
+## Current State (v2 Alpha)
+
+- Video uploads are stored directly on Walrus via the Publisher API.
+- Streaming is handled via HTTP 307 redirects to the Walrus Aggregator.
+- FFmpeg processing is optional. When disabled, paid uploads are rejected to avoid leaking full videos as previews.
 
 ## Features
 
-- **Auto Thumbnail & Preview**: After uploading an MP4, the backend automatically extracts a thumbnail and an N-second preview, uploading both to Walrus in parallel.
-- **Faststart Optimization**: Free videos are automatically processed with `faststart` to optimize streaming playback speed on Walrus.
-- **Seal Encryption (Paid Videos)**: Paid videos are encrypted client-side using the Seal SDK, ensuring only AccessPass holders can decrypt and play them.
-- **Automatic On-Chain Sync (Watcher)**: A background service (Watcher) automatically detects `VideoCreated` events on-chain and links them to local video records, eliminating the need for manual write-backs.
-- **Real-Time Status Tracking (SSE)**: Server-Sent Events provide real-time progress updates, from upload to extraction to Walrus storage status, including automatic sync detection.
-- **Frontend SPA**: Integrated with Slush Wallet, supporting price configuration, video listing, and player (preview → paywall → decrypted playback).
+- Walrus Publisher integration for blob storage
+- Walrus Aggregator redirects for playback (`/stream/*`)
+- Optional FFmpeg preview + thumbnail extraction and faststart optimization
+- Server-Sent Events (SSE) for status updates
+- Sui chain watcher and reindexer to sync on-chain video objects
+- Embedded frontend UI for uploads and playback
 
 ---
 
 ## Architecture
 
-### Video Publishing Flow (Paid Videos)
+### Free Video Flow (price = 0)
 
-To balance security and performance, PayLock uses a hybrid flow of "backend preprocessing + frontend encryption":
+1. Client uploads video to `POST /api/upload` with `price=0` or omitted.
+2. Server optionally extracts preview/thumbnail with FFmpeg and uploads assets to Walrus.
+3. Server marks the video `ready` and returns `preview_blob_id` and `full_blob_id`.
+4. Playback via `GET /stream/{id}/preview` or `GET /stream/{id}/full` (307 redirect).
 
-1. **Backend Preview Generation + Upload**:
-   - Frontend uploads the **full video** to `POST /api/upload` with `price > 0`.
-   - Backend **requires FFmpeg** to extract the preview clip + thumbnail, then uploads the preview to Walrus.
-   - Notifies the frontend via `GET /api/status/{id}/events` (SSE) when `preview_blob_id` is ready.
+### Paid Video Flow (price > 0)
 
-2. **Frontend Encryption & Upload**:
-   - Frontend generates a random `seal_namespace`.
-   - Encrypts the original video using the Seal SDK, then uploads the encrypted blob to Walrus.
+1. Client uploads full video to `POST /api/upload` with `price>0`.
+2. Server extracts preview/thumbnail (FFmpeg required) and uploads preview to Walrus.
+3. Client encrypts the full video (Seal) and uploads the encrypted blob to Walrus.
+4. Client calls `gating::create_video` on-chain with `title`, `price`, `thumbnail_blob_id`, `preview_blob_id`, `full_blob_id`, and `seal_namespace`.
+5. Watcher detects the `VideoCreated` event and links the on-chain object to the local record.
+6. Server marks the video `ready`; playback via `/stream/{sui_object_id}/preview` or `/stream/{sui_object_id}/full`.
 
-3. **On-Chain Publishing & Automatic Sync**:
-   - Frontend initiates a transaction calling `create_video`, which emits a `VideoCreated` event.
-   - Passes `price`, `preview_blob_id`, `full_blob_id` (encrypted), and `seal_namespace`.
-   - **Watcher Service**: The PayLock backend polls for `VideoCreated` events. Once detected, it automatically links the `sui_object_id` to the local record using the `preview_blob_id` as a key.
-   - Frontend simply waits for the video status to transition to `ready`.
+### Streaming & IDs
 
-### Wallet Signing Flow
-
-Paid video uploads now require only **1 mandatory wallet interaction**:
-
-| # | Type | When | Purpose |
-|---|------|------|---------|
-| 1 | **Sign & Execute Transaction** | After encryption & Walrus upload | On-chain publishing — calls `gating::create_video` to write video metadata and emit a `VideoCreated` event. |
-
-Free video uploads require **no wallet signatures** (no on-chain interaction needed).
-
-Identity verification is handled on-chain. The backend Watcher verifies the creator address from the emitted event before updating the local store.
-
-### System Components
-
-```text
-[ Client / Frontend SPA ]
-    │
-    ▼
-[ PayLock Backend (Go) ]
-    ├── POST /api/upload           Validate preview → upload to Walrus
-    ├── GET /api/status/{id}/events SSE real-time progress tracking
-    ├── GET /api/videos            List videos
-    └── [ Watcher Service ]        Polls Sui for VideoCreated events → Auto-link
-    │
-    ├──── Write ────▶ [ Walrus Publisher ] → [ Walrus Storage ]
-    ├──── Read  ────▶ [ Walrus Aggregator ] ← (streaming playback)
-    └──── Poll  ────▶ [ Sui Blockchain ]    ← (detect VideoCreated events)
-```
+- `/stream/{id}/preview` and `/stream/{id}/full` accept both `paylock_id` and `sui_object_id`.
+- If a `paylock_id` has an associated on-chain object, the server redirects to the canonical `sui_object_id` path and returns deprecation headers.
+- `GET /stream/{id}` is deprecated and redirects to `/stream/{id}/preview`.
 
 ---
 
-## On-Chain Contract Design
+## On-Chain Contract
 
-Contract located at `contracts/sources/gating.move`:
+Contract source: `contracts/sources/gating.move`.
 
-```move
-module paylock::gating {
-    /// Video info, created by the creator (shared object)
-    public struct Video has key {
-        id: UID,
-        price: u64,
-        creator: address,
-        preview_blob_id: String,
-        full_blob_id: String,
-        seal_namespace: vector<u8>,
-    }
+Key types and events:
 
-    /// Event emitted when a new video is published
-    public struct VideoCreated has copy, drop {
-        video_id: ID,
-        creator: address,
-        preview_blob_id: String,
-        full_blob_id: String,
-    }
-
-    /// Purchase credential (owned by buyer)
-    public struct AccessPass has key, store {
-        id: UID,
-        video_id: ID,
-    }
-
-    /// Creator publishes video (single transaction)
-    public fun create_video(
-        price: u64,
-        preview_blob_id: String,
-        full_blob_id: String,
-        seal_namespace: vector<u8>,
-        ctx: &mut TxContext
-    );
-
-    /// User pays → mint AccessPass and transfer payment to creator
-    entry fun purchase_and_transfer(video: &Video, payment: Coin<SUI>, ctx: &mut TxContext);
-
-    /// Seal key server verifies decryption permission
-    entry fun seal_approve(id: vector<u8>, pass: &AccessPass, video: &Video);
-}
-```
+- `Video` (shared object): title, price, creator, thumbnail/preview/full blob IDs, seal namespace
+- `VideoCreated` event: emitted by `create_video` for backend sync
+- `VideoDeleted` event: emitted by `delete_video` for backend cleanup
+- `AccessPass` (owned object): proof of purchase for Seal decryption
 
 ---
 
-## Quick Integration (External Developers)
-
-PayLock is a **self-hosted backend service** that handles video processing, Walrus storage, and stream routing. Your frontend only needs to call the REST API + a few on-chain transactions to integrate.
-
-**Public Testnet Instance**: `https://paylock.up.railway.app`
+## Quick Integration (Free Video)
 
 ```js
-// Minimal integration example: upload free video → wait for ready → play
-const PAYLOCK = 'https://paylock.up.railway.app';
+const PAYLOCK = 'http://localhost:8080';
 
 // 1. Upload
 const form = new FormData();
@@ -132,18 +71,21 @@ form.append('video', file);
 const { id } = await fetch(`${PAYLOCK}/api/upload`, { method: 'POST', body: form }).then(r => r.json());
 
 // 2. Wait for processing (SSE)
-await new Promise((resolve) => {
+await new Promise((resolve, reject) => {
   const es = new EventSource(`${PAYLOCK}/api/status/${id}/events`);
   es.onmessage = (e) => {
-    if (JSON.parse(e.data).status === 'ready') { es.close(); resolve(); }
+    const v = JSON.parse(e.data);
+    if (v.status === 'ready') { es.close(); resolve(); }
+    if (v.status === 'failed') { es.close(); reject(new Error(v.error || 'failed')); }
   };
+  es.onerror = () => { es.close(); reject(new Error('SSE error')); };
 });
 
 // 3. Play — browser auto-follows 307 redirect to Walrus
 videoElement.src = `${PAYLOCK}/stream/${id}/preview`;
 ```
 
-For the full paid video integration flow, see [API.md — Paid Video Integration Guide](./API.md#paid-video-integration-guide).
+For paid flow details, see `API.md`.
 
 ---
 
@@ -152,19 +94,27 @@ For the full paid video integration flow, see [API.md — Paid Video Integration
 ### Prerequisites
 
 - Go 1.25+
-- **FFmpeg** (required, checked at startup)
+- FFmpeg + FFprobe (required for paid uploads; recommended for previews/faststart)
 
 ### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PAYLOCK_PORT` | `8080` | HTTP listen port |
-| `PAYLOCK_DATA_DIR` | `data` | Metadata and local cache storage path |
-| `PAYLOCK_WALRUS_PUBLISHER_URL` | `...` | Walrus Publisher |
-| `PAYLOCK_WALRUS_AGGREGATOR_URL` | `...` | Walrus Aggregator |
-| `PAYLOCK_WALRUS_EPOCHS` | `5` | Walrus storage epochs |
-| `PAYLOCK_SUI_RPC_URL` | `...` | Sui RPC (Testnet) |
-| `PAYLOCK_GATING_PACKAGE_ID` | _(required)_ | Deployed contract Package ID |
+| `PAYLOCK_DATA_DIR` | `data` | Metadata and local cache storage |
+| `PAYLOCK_WALRUS_PUBLISHER_URL` | `https://publisher.walrus-testnet.walrus.space` | Walrus Publisher API |
+| `PAYLOCK_WALRUS_AGGREGATOR_URL` | `https://aggregator.walrus-testnet.walrus.space` | Walrus Aggregator API |
+| `PAYLOCK_WALRUS_EPOCHS` | `5` | Walrus storage duration in epochs |
+| `PAYLOCK_MAX_FILE_SIZE_MB` | `500` | Upload size limit in MB |
+| `PAYLOCK_MAX_PREVIEW_SIZE_MB` | `50` | Max preview size (MB) |
+| `PAYLOCK_MAX_PREVIEW_DURATION` | `300` | Max preview duration (seconds) |
+| `PAYLOCK_ENABLE_FFMPEG` | `true` | Enable FFmpeg processing |
+| `PAYLOCK_FFMPEG_PATH` | `ffmpeg` | FFmpeg binary path |
+| `PAYLOCK_FFPROBE_PATH` | `ffprobe` | FFprobe binary path |
+| `PAYLOCK_SUI_RPC_URL` | `https://fullnode.testnet.sui.io:443` | Sui RPC endpoint |
+| `PAYLOCK_GATING_PACKAGE_ID` | `0xec50...161a` | Deployed gating package ID |
+| `PAYLOCK_ADMIN_SECRET` | (empty) | Bearer token for `/api/reindex` |
+| `PAYLOCK_WATCHER_INTERVAL` | `5` | Chain watcher poll interval (seconds) |
 
 ### Start the Server
 
@@ -180,16 +130,7 @@ make run
 
 ## API Reference
 
-PayLock provides a complete RESTful API with SSE event streams, enabling developers to integrate video paywall functionality into any video application.
-
-For detailed API specs and integration guide, see: [**API.md — PayLock Infrastructure Specification**](./API.md)
-
-### Core Endpoints Summary
-
-1. **Upload Video**: `POST /api/upload` — Initiate async processing.
-2. **Real-Time Tracking**: `GET /api/status/{id}/events` — Get progress (including Watcher sync) via SSE.
-3. **Preview Playback**: `GET /stream/{id}/preview` — 307 redirect to preview.
-4. **System Config**: `GET /api/config` — Get contract, Walrus, and Watcher info.
+See `API.md` for full API specs and the paid video integration guide.
 
 ---
 

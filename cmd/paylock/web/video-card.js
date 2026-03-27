@@ -68,30 +68,39 @@ export function VideoCard({ video, showDelete, onDeleted, accessState }) {
         <div class="video-id" style="cursor:pointer" onclick=${() => navigate('player', { id: video.id })}>
           ${video.title || video.id}
         </div>
-        <div class="video-meta">
-          ${video.sui_object_id
-            ? html`<span>Object ID: <a href=${'https://suiscan.xyz/testnet/object/' + video.sui_object_id} target="_blank" rel="noopener noreferrer"
+        <div class="video-meta" style="display:flex; flex-direction:column; align-items:flex-start; gap:0.4rem;">
+          <!-- Row 1: ID -->
+          <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; width:100%;">
+            ${video.sui_object_id
+              ? html`<span>Object ID: <a href=${'https://suiscan.xyz/testnet/object/' + video.sui_object_id} target="_blank" rel="noopener noreferrer"
+                  onclick=${(e) => e.stopPropagation()}
+                  style="font-family:monospace; color:var(--accent); text-decoration:none; border-bottom:1px dashed var(--accent);"
+                  title=${video.sui_object_id}>${shortAddr(video.sui_object_id)}</a></span>`
+              : html`<span style="font-family:monospace" title=${video.id}>ID: ${shortAddr(video.id)}</span>`
+            }
+          </div>
+          <!-- Row 2: Badges -->
+          <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; width:100%;">
+            <span class=${'status-badge ' + safeStatus}>${video.status}</span>
+            <span class=${isPaid ? 'price-badge paid' : 'price-badge free'}>
+              ${isPaid ? formatSui(video.price) + ' SUI' : 'Free'}
+            </span>
+            ${isPaid && safeAccess && html`
+              <span class=${'access-badge ' + safeAccess}>${accessLabel}</span>
+            `}
+          </div>
+          <!-- Row 3: Date & Owner -->
+          <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap; width:100%;">
+            <span>${formatDate(video.created_at)}</span>
+            ${video.creator && html`
+              <span>Owner: <a href=${'https://suiscan.xyz/testnet/account/' + video.creator} target="_blank" rel="noopener noreferrer"
                 onclick=${(e) => e.stopPropagation()}
                 style="font-family:monospace; color:var(--accent); text-decoration:none; border-bottom:1px dashed var(--accent);"
-                title=${video.sui_object_id}>${shortAddr(video.sui_object_id)}</a></span>`
-            : html`<span style="font-family:monospace">ID: ${video.id}</span>`
-          }
-          <span class=${'status-badge ' + safeStatus}>${video.status}</span>
-          <span class=${isPaid ? 'price-badge paid' : 'price-badge free'}>
-            ${isPaid ? formatSui(video.price) + ' SUI' : 'Free'}
-          </span>
-          ${isPaid && safeAccess && html`
-            <span class=${'access-badge ' + safeAccess}>${accessLabel}</span>
-          `}
-          <span>${formatDate(video.created_at)}</span>
-          ${video.creator && html`
-            <span>Owner: <a href=${'https://suiscan.xyz/testnet/account/' + video.creator} target="_blank" rel="noopener noreferrer"
-              onclick=${(e) => e.stopPropagation()}
-              style="font-family:monospace; color:var(--accent); text-decoration:none; border-bottom:1px dashed var(--accent);"
-              title=${video.creator}>
-              ${shortAddr(video.creator)}
-            </a></span>
-          `}
+                title=${video.creator}>
+                ${shortAddr(video.creator)}
+              </a></span>
+            `}
+          </div>
         </div>
       </div>
       ${showDelete && html`
