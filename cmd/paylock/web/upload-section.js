@@ -418,8 +418,15 @@ async function confirmUpload(fileInput) {
       uploadState.value = { ...uploadState.value, step: 'onchain', previewDone: true, browserStep: 'done', text: 'Creating video on-chain...' };
       const videoTitle = document.getElementById('video-title').value || '';
       const suiObjectId = await mod.createVideoOnChain(data.id, videoTitle, priceMist, video.thumbnail_blob_id || '', video.preview_blob_id, encResult.fullBlobId, encResult.namespace);
-      uploadState.value = { ...uploadState.value, step: 'confirming', text: 'Waiting for chain confirmation...' };
-      await pollUntilReady(data.id);
+      uploadState.value = { ...uploadState.value, step: 'confirming', text: 'Linking on-chain video...' };
+      const linkRes = await fetch('/api/videos/' + encodeURIComponent(data.id) + '/link', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sui_object_id: suiObjectId, full_blob_id: encResult.fullBlobId }),
+      });
+      if (!linkRes.ok) {
+        await pollUntilReady(data.id);
+      }
       navigateId = suiObjectId;
     } else {
       uploadState.value = { ...uploadState.value, showSpinner: true, text: 'Processing video...' };
@@ -437,8 +444,15 @@ async function confirmUpload(fileInput) {
           video.full_blob_id,
           [],
         );
-        uploadState.value = { ...uploadState.value, text: 'Waiting for chain confirmation...' };
-        await pollUntilSuiObjectId(data.id);
+        uploadState.value = { ...uploadState.value, text: 'Linking on-chain video...' };
+        const linkRes = await fetch('/api/videos/' + encodeURIComponent(data.id) + '/link', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sui_object_id: suiObjectId, full_blob_id: video.full_blob_id }),
+        });
+        if (!linkRes.ok) {
+          await pollUntilSuiObjectId(data.id);
+        }
         navigateId = suiObjectId;
       } catch (err) {
         // Video is still usable on Walrus — warn but don't fail

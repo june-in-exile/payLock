@@ -19,14 +19,16 @@ PayLock is a **video-native decentralized storage infrastructure** for Sui. It i
 
 ## Core Workflows
 
-1. **Upload (`POST /api/upload`)**: 
+1. **Upload (`POST /api/upload`)**:
    - Receives video via multipart form.
    - **Free Videos**: Server extracts a preview (if needed), optimizes for fast-start, and uploads both preview and full video to Walrus.
    - **Paid Videos**: Server extracts a preview and thumbnail, uploads them to Walrus, and waits for the client to encrypt and upload the full video on-chain.
-2. **Status (`GET /api/status/{id}`)**: 
+2. **Status (`GET /api/status/{id}`)**:
    - SSE endpoint providing real-time updates on processing and Walrus upload progress.
-3. **Chain Sync**:
-   - Background watcher monitors Sui events to link on-chain video objects to local metadata once the client completes the `create_video` transaction.
+3. **On-chain Link (`PATCH /api/videos/{id}/link`)**:
+   - After `create_video` succeeds on-chain, the client calls this endpoint with `sui_object_id` and `full_blob_id` to immediately link the on-chain object and transition the video to `ready`.
+4. **Chain Sync (fallback)**:
+   - Background watcher monitors Sui events to link on-chain video objects to local metadata as a fallback if the PATCH call fails.
 
 ## Development Conventions
 

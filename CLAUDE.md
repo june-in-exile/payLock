@@ -39,6 +39,7 @@ PayLock is a video upload service that stores video files on Walrus decentralize
 cmd/paylock/main.go          — wires all packages; route groups:
                             POST /api/upload, GET /api/videos/{id}
                             GET /api/videos, DELETE /api/videos/{id}
+                            PATCH /api/videos/{id}/link
                             GET /api/status/{id} (SSE)
                             GET /api/config
 
@@ -58,6 +59,7 @@ internal/indexer/         — Sui chain reindexer (scans on-chain Video objects 
 - **Purchase flow**: User pays via `purchase_and_transfer` → mints AccessPass → Seal SessionKey + `seal_approve` tx → decrypt encrypted blob in browser → play via blob URL.
 - **No local file storage**: Videos go directly to Walrus. No HLS segmentation.
 - **VideoStore persists to disk**: Video metadata is saved as `videos.json` in `PAYLOCK_DATA_DIR` (default `data/`). Deleting the file only removes local records; Walrus blobs are unaffected.
+- **On-chain link handoff**: After `create_video` succeeds on-chain, the frontend calls `PATCH /api/videos/{id}/link` with `sui_object_id` and `full_blob_id` to immediately transition the video to `ready`. The chain watcher serves as a fallback if the PATCH fails.
 - **Canonical ID = sui_object_id**: External discovery uses `sui_object_id`. `paylock_id` is a temporary internal workflow ID used during upload.
 - **Chain reindexer**: On startup, the server scans the Sui chain for all `Video` objects created by the gating package and populates the VideoStore. If `videos.json` is missing, the store is rebuilt from chain state.
 - **Supported video formats**: MP4, MOV (ftyp box), WebM, MKV (EBML header), AVI (RIFF/AVI). Validated by magic bytes, not file extension.

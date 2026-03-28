@@ -93,6 +93,7 @@ func main() {
 	mux.Handle("GET /api/videos/{id}", handler.NewVideo(videos))
 	mux.Handle("GET /api/videos", handler.NewVideos(videos))
 	mux.Handle("DELETE /api/videos/{id}", handler.NewDelete(videos, sigVerifier, clock))
+	mux.Handle("PATCH /api/videos/{id}/link", handler.NewLink(videos, wc))
 	mux.Handle("GET /api/status/{id}", handler.NewStatusEvents(videos))
 	mux.Handle("GET /api/config", handler.NewAppConfig(cfg))
 

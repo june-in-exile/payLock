@@ -50,8 +50,8 @@ sequenceDiagram
 2. Server extracts a preview clip and thumbnail, uploads them to Walrus, and sets status to `processing` with `preview_blob_id` available.
 3. Client encrypts the full video with [Seal](https://github.com/MystenLabs/seal) (`@mysten/seal`) and uploads the encrypted blob to Walrus.
 4. Client calls `gating::create_video` on-chain with all blob IDs and the Seal namespace.
-5. The chain watcher detects the `VideoCreated` event and links the on-chain object to the local record.
-6. Status transitions to `ready`. The video object contains `preview_blob_url` and `full_blob_url` for playback.
+5. Client calls `PATCH /api/videos/{id}/link` with the `sui_object_id` and `full_blob_id` to immediately link the on-chain object.
+6. Status transitions to `ready`. The video object contains `preview_blob_url` and `full_blob_url` for playback. (The chain watcher serves as a fallback if the PATCH fails.)
 
 ```mermaid
 sequenceDiagram
@@ -70,7 +70,7 @@ sequenceDiagram
     Seal-->>C: Encrypted full blob
     C->>W: Upload encrypted full blob
     C->>Sui: gating::create_video (blob IDs, namespace)
-    Sui-->>S: VideoCreated event (chain watcher)
+    C->>S: PATCH /api/videos/{id}/link (sui_object_id, full_blob_id)
     S->>S: Link on-chain object → local record
     S-->>S: Status → ready
 ```

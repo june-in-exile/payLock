@@ -10,9 +10,9 @@ PayLock is a **decentralized video storage infrastructure** for Sui. It manages 
 
 - Video uploads are stored directly on Walrus via the Publisher API.
 - **Free videos**: stored as single blob, served via 307 redirect to Walrus Aggregator.
-- **Paid videos**: preview/thumbnail extracted via FFmpeg; full blob linked from on-chain Sui transaction.
+- **Paid videos**: preview/thumbnail extracted via FFmpeg; full blob linked via `PATCH /api/videos/{id}/link` after on-chain `create_video`.
 - **Sui wallet authentication**: Ed25519 signature verification via `suiauth` package.
-- **Chain sync**: background watcher polls for `VideoCreated`/`VideoDeleted` events; startup indexer rehydrates state from chain.
+- **Chain sync (fallback)**: background watcher polls for `VideoCreated`/`VideoDeleted` events; startup indexer rehydrates state from chain. The watcher acts as a fallback if the client's PATCH link call fails.
 - **FFmpeg is required** (`PAYLOCK_ENABLE_FFMPEG=true` default).
 
 ## Build Commands

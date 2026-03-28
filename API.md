@@ -218,6 +218,44 @@ Deletes a video record from the PayLock database.
 
 ---
 
+### `PATCH /api/videos/{id}/link`
+
+Links an on-chain Sui object to an existing video record. Called by the client after `create_video` succeeds on-chain, so the server can immediately transition the video to `ready` without waiting for the chain watcher poll.
+
+**Content-Type**: `application/json`
+
+**Path Parameters:**
+
+- `id`: The internal `paylock_id` returned by `POST /api/upload`.
+
+**Request Body:**
+
+| Field            | Type   | Required | Description                                                                                                        |
+|------------------|--------|----------|--------------------------------------------------------------------------------------------------------------------|
+| `sui_object_id`  | string | Yes      | The `0x`-prefixed object ID returned by the on-chain `create_video` transaction.                                   |
+| `full_blob_id`   | string | No       | The Walrus blob ID of the full (possibly encrypted) video. If provided, `full_blob_url` is derived automatically.  |
+
+**Response `200 OK`**
+Returns the updated [Video Object](#video-object) with `status: "ready"` and `sui_object_id` set.
+
+**Errors:**
+
+- `400 Bad Request`: Missing `sui_object_id` or invalid JSON body.
+- `404 Not Found`: No video matches the provided `id`.
+
+**Example:**
+
+```js
+await fetch(`${PAYLOCK}/api/videos/${id}/link`, {
+  method: 'PATCH',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    sui_object_id: '0x789...abc',
+    full_blob_id: 'blobId123',
+  }),
+});
+```
+
 ---
 
 ### `GET /api/config`
@@ -305,9 +343,19 @@ tx.moveCall({
 });
 ```
 
-### 4. Wait for watcher sync
+### 4. Link on-chain object to server
 
-The chain watcher polls Sui for `VideoCreated` events and links the on-chain object to the local record. Poll `GET /api/videos/{id}` or reconnect to the SSE stream (`GET /api/status/{id}`) until `status === 'ready'` and `sui_object_id` is set.
+After the on-chain transaction succeeds, call `PATCH /api/videos/{id}/link` to immediately link the `sui_object_id` and transition the video to `ready`. This bypasses the chain watcher poll delay.
+
+```js
+await fetch(`${PAYLOCK}/api/videos/${id}/link`, {
+  method: 'PATCH',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ sui_object_id: suiObjectId, full_blob_id: fullBlobId }),
+});
+```
+
+The chain watcher still runs as a fallback — if the PATCH call fails (e.g., network error), the watcher will eventually link the video automatically.
 
 ---
 
